@@ -117,39 +117,3 @@ if __name__ == "__main__":
             time.sleep(0.35)
 
         robot.MoveCart(MAIN,0,0,75.0,20.0,100.0,200.0,-1)
-
-
-
-        
-        
-
-    #cut_cake = [[START_X, START_Y, START_Z, RX, RY, RZ],
-    #            [START_X, START_Y, START_Z-0.166, RX, RY, RZ],
-    #            [START_X, START_Y+0.15, START_Z-0.166, RX, RY, RZ],
-    #            [START_X, START_Y+0.15, START_Z, RX, RY, RZ],
-    #            [START_X-0.05, START_Y+0.15, START_Z, RX-0.15, RY+1.0, RZ],
-    #            [START_X-0.095, START_Y+0.15, START_Z, RX-0.15, RY+1.0, RZ],
-    #            [START_X-0.095, START_Y-0.04, START_Z, RX-0.15, RY+1.0, RZ],
-    #            [START_X-0.095, START_Y-0.04, START_Z-0.162, RX-0.15, RY+1.0, RZ],
-    #            [START_X-0.23, START_Y+0.15, START_Z-0.162, RX-0.15, RY+1.0, RZ],
-    #            [START_X, START_Y+0.15, START_Z, RX, RY, RZ]]
-
-
-
-    # GOAL (-0.100, -1.000, -0.400, -3.14, 0, 0)
-    # Z offset = 0.400m
-
-    #main = (-0.100, -1.000, -0.000, -3.14, 0, 0)
-    #rtde_c = rtde_control.RTDEControlInterface("192.168.0.11")
-    #rtde_r = rtde_receive.RTDEReceiveInterface("192.168.0.11")
-    #actual_q = rtde_r.getActualTCPPose()    
-    #print(actual_q)
-    #rtde_c.moveL(main)
-    #actual_q = rtde_r.getActualTCPPose()    
-    #print(actual_q)
-    
-    #new_q = copy.deepcopy(actual_q)
-    #new_q[0] -= 0.1
-    #rtde_c.moveL(main)
-    #time.sleep(1)
-    #rtde_c.moveL(actual_q)
