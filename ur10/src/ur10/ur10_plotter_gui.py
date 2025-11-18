@@ -7,6 +7,7 @@ import os
 import threading
 from typing import Union
 import cv2
+import json
 
 from gui_layout import create_layout
 from gui_preview import update_preview
@@ -24,6 +25,23 @@ def main():
     layout = create_layout()
     window = sg.Window("Vpype GUI", layout, finalize=True, resizable=True)
     
+    # Load home position from config file
+    home_pose = None
+    try:
+        with open("home_config.json", "r") as f:
+            config = json.load(f)
+            home_pose = config.get("pose")
+            corner = config.get("corner", "Top Left")
+            if home_pose:
+                pose_str = ", ".join([f"{x:.3f}" for x in home_pose])
+                window["-HOME_POSE_DISPLAY-"].update(pose_str)
+                window["-CANVAS_CORNER-"].update(corner)
+                print(f"Loaded home position: {pose_str}")
+    except FileNotFoundError:
+        print("home_config.json not found. Please set a home position.")
+    except (json.JSONDecodeError, KeyError):
+        print("Error reading home_config.json. File might be corrupted.")
+
     window["-GRAPH-"].hide_row()
     document: Union[vpype.Document, None] = None
     ur10_controller: Union[UR10Controller, None] = None
@@ -119,7 +137,8 @@ def main():
                     window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
                     window["-BTN_OPTIMIZE-"].update(disabled=True)
-                    window["-LOADING-"].update(visible=True)
+                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=True)
+                    window["-LOG-"].print("Processing... please wait.")
                     
                     # 2. Start the worker thread
                     threading.Thread(
@@ -199,7 +218,8 @@ def main():
                     window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
                     window["-BTN_OPTIMIZE-"].update(disabled=True)
-                    window["-LOADING-"].update(visible=True)
+                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=True)
+                    window["-LOG-"].print("Processing... please wait.")
                     
                     threading.Thread(
                         target=run_hatched_thread, # Call the thread function
@@ -216,7 +236,7 @@ def main():
                     window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
                     window["-BTN_OPTIMIZE-"].update(disabled=False)
-                    window["-LOADING-"].update(visible=False)
+                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=False)
                     
                     # 3. Handle results
                     if error_message:
@@ -233,16 +253,20 @@ def main():
                         update_preview(window, None, is_cmyk=False) # Show a blank screen
                 
                 # --- Optimize Event ---
-                elif event == "-BTN_OPTIMIZE-":
+                elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-"):
                     if document is None:
                         print("No drawing to optimize. Generate or vectorize first.")
                         continue
                     
                     print("Optimizing drawing...")
                     
-                    merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
-                    simplify_tol = values["-OPT_SIMPLIFY-"].strip().replace("mm", "").strip()
-                    
+                    if event == "-BTN_OPTIMIZE-":
+                        merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
+                        simplify_tol = values["-OPT_SIMPLIFY-"].strip().replace("mm", "").strip()
+                    else:
+                        merge_tol = values["-OPT_MERGE-HATCHED-"].strip().replace("mm", "").strip()
+                        simplify_tol = values["-OPT_SIMPLIFY-HATCHED-"].strip().replace("mm", "").strip()
+
                     cmd_string = f"linemerge -t {merge_tol}mm linesimplify -t {simplify_tol}mm linesort"
                     
                     print(f"Running command: vpype {cmd_string}")
@@ -265,7 +289,7 @@ def main():
                         print("Optimization failed.")
 
                 # --- Save Event ---
-                elif event == "-BTN_SAVE-":
+                elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-"):
                     if document is None:
                         print("Error: No document to save. Generate or vectorize first.")
                         continue
@@ -301,6 +325,7 @@ def main():
                             window["-BTN_UR10_CONNECT-"].update(text="Disconnect")
                             window["-BTN_SEND_SVG-"].update(disabled=False)
                             window["-BTN_UR10_HOME-"].update(disabled=False)
+                            window["-BTN_SET_HOME-"].update(disabled=False)
                         else:
                             window["-UR10_STATUS-"].print("Connection failed.")
                             ur10_controller = None
@@ -310,7 +335,29 @@ def main():
                         window["-BTN_UR10_CONNECT-"].update(text="Connect to UR10")
                         window["-BTN_SEND_SVG-"].update(disabled=True)
                         window["-BTN_UR10_HOME-"].update(disabled=True)
+                        window["-BTN_SET_HOME-"].update(disabled=True)
                         ur10_controller = None
+
+                elif event == "-BTN_SET_HOME-":
+                    if ur10_controller and ur10_controller.is_connected:
+                        window["-UR10_STATUS-"].print("Getting current robot position...")
+                        current_pose = ur10_controller.get_current_pose()
+                        if current_pose:
+                            home_pose = current_pose
+                            config = {
+                                "pose": home_pose,
+                                "corner": values["-CANVAS_CORNER-"]
+                            }
+                            with open("home_config.json", "w") as f:
+                                json.dump(config, f)
+                            
+                            pose_str = ", ".join([f"{x:.3f}" for x in home_pose])
+                            window["-HOME_POSE_DISPLAY-"].update(pose_str)
+                            window["-UR10_STATUS-"].print(f"Home position set to: {pose_str}")
+                        else:
+                            window["-UR10_STATUS-"].print("Failed to get current position.")
+                    else:
+                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-BTN_SEND_SVG-":
                     if ur10_controller and ur10_controller.is_connected:
@@ -319,52 +366,82 @@ def main():
                             window["-UR10_STATUS-"].print("Error: SVG file not found.")
                             continue
                         
+                        if not home_pose:
+                            window["-UR10_STATUS-"].print("Error: Home position not set.")
+                            continue
+
                         try:
-                            home_x = float(values["-HOME_X-"])
-                            home_y = float(values["-HOME_Y-"])
-                            home_z = float(values["-HOME_Z-"])
-                            home_rx = float(values["-HOME_RX-"])
-                            home_ry = float(values["-HOME_RY-"])
-                            home_rz = float(values["-HOME_RZ-"])
-                            home_pose = [home_x, home_y, home_z, home_rx, home_ry, home_rz]
-                            
                             scale = float(values["-SVG_SCALE-"])
                             dry_run = values["-DRY_RUN-"]
+                            corner = values["-CANVAS_CORNER-"]
                             
+                            speed_control = [values["-PLOT_SPEED-"]]
+
                             window["-UR10_STATUS-"].print(f"Parsing SVG file: {svg_file}")
-                            path = parse_svg(svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz, scale, dry_run)
+                            home_x, home_y, home_z, home_rx, home_ry, home_rz = home_pose
+                            
+                            path, width, height = parse_svg(svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz, scale, dry_run, corner)
                             
                             if path:
-                                window["-UR10_STATUS-"].print("Sending path to robot...")
-                                ur10_controller.execute_path(path, home_pose)
-                                window["-UR10_STATUS-"].print("Path execution finished.")
+                                window["-BTN_SEND_SVG-"].update(disabled=True)
+                                window["-BTN_STOP-"].update(disabled=False)
+                                window["-REALTIME_GRAPH-"].erase()
+
+                                graph_size = window["-REALTIME_GRAPH-"].CanvasSize
+                                
+                                def transform_coordinates(x, y):
+                                    # Normalize robot coordinates (0-1)
+                                    norm_x = (x - home_x) / width
+                                    norm_y = (y - home_y) / height
+                                    
+                                    # Scale to graph size
+                                    graph_x = norm_x * graph_size[0]
+                                    graph_y = graph_size[1] - (norm_y * graph_size[1]) # Invert Y-axis
+                                    return graph_x, graph_y
+
+                                threading.Thread(
+                                    target=ur10_controller.execute_path_realtime,
+                                    args=(path, home_pose, speed_control, window),
+                                    daemon=True
+                                ).start()
                             else:
                                 window["-UR10_STATUS-"].print("Error: Could not parse SVG path.")
 
                         except ValueError:
-                            window["-UR10_STATUS-"].print("Error: Invalid home position or scale values.")
+                            window["-UR10_STATUS-"].print("Error: Invalid scale value.")
                         except Exception as e:
                             window["-UR10_STATUS-"].print(f"An error occurred: {e}")
                     else:
                         window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
+                elif event == "-DRAW_LINE-":
+                    start_point, end_point = values[event]
+                    
+                    x1, y1 = transform_coordinates(start_point[0], start_point[1])
+                    x2, y2 = transform_coordinates(end_point[0], end_point[1])
+
+                    window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
+
+                elif event == "-BTN_STOP-":
+                    if ur10_controller and ur10_controller.is_connected:
+                        ur10_controller.stop_event.set()
+                        window["-BTN_SEND_SVG-"].update(disabled=False)
+                        window["-BTN_STOP-"].update(disabled=True)
+
                 elif event == "-BTN_UR10_HOME-":
                     if ur10_controller and ur10_controller.is_connected:
-                        try:
-                            home_x = float(values["-HOME_X-"])
-                            home_y = float(values["-HOME_Y-"])
-                            home_z = float(values["-HOME_Z-"])
-                            home_rx = float(values["-HOME_RX-"])
-                            home_ry = float(values["-HOME_RY-"])
-                            home_rz = float(values["-HOME_RZ-"])
-                            home_pose = [home_x, home_y, home_z, home_rx, home_ry, home_rz]
+                        if home_pose:
                             window["-UR10_STATUS-"].print("Sending robot to home position...")
                             ur10_controller.go_home(home_pose)
                             window["-UR10_STATUS-"].print("Robot is at home.")
-                        except ValueError:
-                            window["-UR10_STATUS-"].print("Error: Invalid home position values.")
+                        else:
+                            window["-UR10_STATUS-"].print("Error: Home position not set.")
                     else:
                         window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+
+                if 'speed_control' in locals():
+                    speed_control[0] = values["-PLOT_SPEED-"]
+
 
 
             except Exception as e:

@@ -36,9 +36,16 @@ def create_layout():
             sg.Checkbox("Trim Border (`-tm`)", key="-FLOW_TRIM-", default=False),
         ],
         [sg.Button("Vectorize with Flow Imager", key="-BTN_VECTORIZE_FLOW-", expand_x=True, font="Helvetica 10 bold")],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Text("Optimization", font="Helvetica 12")],
+        [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-", s=(10, 1))],
+        [sg.Text("Simplify Tol. (mm):", s=(15, 1)), sg.Input("0.05", key="-OPT_SIMPLIFY-", s=(10, 1))],
+        [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-", expand_x=True)],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Button("Save SVG", key="-BTN_SAVE-", expand_x=True, button_color=("white", "green"))],
     ]
     # Make the Flow tab scrollable
-    flow_controls_col = [[sg.Column(flow_controls, scrollable=True, vertical_scroll_only=True, size=(TAB_WIDTH, TAB_HEIGHT), pad=(0,0))]]
+    flow_controls_col = [[sg.Column(flow_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
 
 
     # --- Tab 2: Hatched ---
@@ -71,9 +78,16 @@ def create_layout():
             sg.Checkbox("Draw Hatch Fill", key="-HATCHED_HATCH-", default=True),
         ],
         [sg.Button("Vectorize with Hatched", key="-BTN_VECTORIZE_HATCHED-", expand_x=True, font="Helvetica 10 bold")],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Text("Optimization", font="Helvetica 12")],
+        [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-HATCHED-", s=(10, 1))],
+        [sg.Text("Simplify Tol. (mm):", s=(15, 1)), sg.Input("0.05", key="-OPT_SIMPLIFY-HATCHED-", s=(10, 1))],
+        [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-HATCHED-", expand_x=True)],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Button("Save SVG", key="-BTN_SAVE-HATCHED-", expand_x=True, button_color=("white", "green"))],
     ]
     # Make the Hatched tab scrollable
-    hatched_controls_col = [[sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=(TAB_WIDTH, TAB_HEIGHT), pad=(0,0))]]
+    hatched_controls_col = [[sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
 
     
     # --- Tab 3: Instructions (with text wrapping and units) ---
@@ -111,10 +125,21 @@ def create_layout():
         [sg.Text("H-Mirror:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Flips the image horizontally.", size=(DESC_W, None))],
         [sg.Text("Draw Contours:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the outlines of the shadow shapes.", size=(DESC_W, None))],
         [sg.Text("Draw Hatch Fill:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the shading lines inside the contours.", size=(DESC_W, None))],
+
+        [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
+        [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
+        [sg.Text("Connect to UR10:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Connects to the robot at the specified IP address.", size=(DESC_W, None))],
+        [sg.Text("SVG File:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The SVG file to be plotted by the robot.", size=(DESC_W, None))],
+        [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Move the robot to the desired home position and click this button to save it.", size=(DESC_W, None))],
+        [sg.Text("Canvas Corner:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The corner of the canvas to use as the origin.", size=(DESC_W, None))],
+        [sg.Text("SVG Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The scale of the SVG file.", size=(DESC_W, None))],
+        [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("If checked, the robot will not lower the pen to the drawing surface.", size=(DESC_W, None))],
+        [sg.Text("Send SVG to Robot:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Sends the SVG file to the robot for plotting.", size=(DESC_W, None))],
+        [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the saved home position.", size=(DESC_W, None))],
     ]
 
     # Create a scrollable column for the instructions
-    instructions_tab = [[sg.Column(instructions_layout, scrollable=True, vertical_scroll_only=True, size=(TAB_WIDTH, TAB_HEIGHT), pad=(0,0))]]
+    instructions_tab = [[sg.Column(instructions_layout, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
 
 
     # --- Tab 3: UR10 Control ---
@@ -125,22 +150,36 @@ def create_layout():
         [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1)), sg.FileBrowse(target="-SVG_PATH-")],
-        [sg.Text("Home X:", s=(10,1)), sg.Input("-0.100", key="-HOME_X-", s=(10,1)), sg.Text("Y:"), sg.Input("-1.000", key="-HOME_Y-", s=(10,1)), sg.Text("Z:"), sg.Input("-0.0", key="-HOME_Z-", s=(10,1))],
-        [sg.Text("Home Rx:", s=(10,1)), sg.Input("3.14", key="-HOME_RX-", s=(10,1)), sg.Text("Ry:"), sg.Input("0", key="-HOME_RY-", s=(10,1)), sg.Text("Rz:"), sg.Input("0", key="-HOME_RZ-", s=(10,1))],
+        [sg.Text("Home Position:", s=(15,1)), sg.Input("Not Set", key="-HOME_POSE_DISPLAY-", s=(30,1), disabled=True)],
+        [
+            sg.Button("Set Home to Current Position", key="-BTN_SET_HOME-", expand_x=True, disabled=True),
+        ],
+        [
+            sg.Text("Canvas Corner:", s=(15,1)), 
+            sg.DropDown(
+                ["Top Left", "Top Right", "Bottom Left", "Bottom Right"], 
+                default_value="Top Left", 
+                key="-CANVAS_CORNER-", 
+                s=(20,1),
+                readonly=True
+            )
+        ],
         [sg.Text("SVG Scale:", s=(15, 1)), sg.Input("9", key="-SVG_SCALE-", s=(10, 1))],
+        [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.1, 1.0), default_value=0.25, resolution=0.05, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
         [sg.Button("Send SVG to Robot", key="-BTN_SEND_SVG-", expand_x=True, disabled=True)],
+        [sg.Button("Stop Plotting", key="-BTN_STOP-", expand_x=True, disabled=True)],
         [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("Status:")],
         [sg.Multiline(key="-UR10_STATUS-", size=(50, 5), autoscroll=True, disabled=True)],
     ]
-    ur10_controls_col = [[sg.Column(ur10_controls, scrollable=True, vertical_scroll_only=True, size=(TAB_WIDTH, TAB_HEIGHT), pad=(0,0))]]
+    ur10_controls_col = [[sg.Column(ur10_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
 
 
     # --- Main Controls Column ---
     controls_column = [
-        [sg.Text("Vpype GUI", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
+        [sg.Text("PLOTTUR10 GUI", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
         
         [sg.TabGroup([
             [
@@ -149,40 +188,45 @@ def create_layout():
                 sg.Tab("UR10 Control", ur10_controls_col, key="-TAB_UR10-"),
                 sg.Tab("Instructions", instructions_tab, key="-TAB_INSTRUCTIONS-")
             ]
-        ], key="-TABGROUP-", expand_x=True)],
-
-        [sg.Text("Processing... please wait.", key="-LOADING-", visible=False, font="Helvetica 10 bold", text_color="yellow", justification="center", expand_x=True)],
-        
-        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
-        [sg.Text("Optimization", font="Helvetica 12")],
-        [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-", s=(10, 1))],
-        [sg.Text("Simplify Tol. (mm):", s=(15, 1)), sg.Input("0.05", key="-OPT_SIMPLIFY-", s=(10, 1))],
-        [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-", expand_x=True)],
-        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
-        
-        [sg.Button("Save SVG", key="-BTN_SAVE-", expand_x=True, button_color=("white", "green"))]
+        ], key="-TABGROUP-", expand_x=True, expand_y=True)],
     ]
 
     visual_column = [
         [sg.Text("Preview", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
-        [
-            sg.Graph(
-                canvas_size=(600, 600),
-                graph_bottom_left=(0, 600),
-                graph_top_right=(600, 0),
-                key="-GRAPH-",
-                background_color="white",
-                enable_events=True
-            )
-        ],
-        [sg.Image(key="-VISUAL-", size=(600, 600), background_color="white")]
+        [sg.TabGroup([
+            [
+                sg.Tab("Final Preview", [
+                    [sg.Graph(
+                        canvas_size=(600, 600),
+                        graph_bottom_left=(0, 600),
+                        graph_top_right=(600, 0),
+                        key="-GRAPH-",
+                        background_color="white",
+                        enable_events=True,
+                        expand_x=True, expand_y=True
+                    )],
+                    [sg.Image(key="-VISUAL-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]
+                ], key="-TAB_FINAL_PREVIEW-"),
+                sg.Tab("Real-time Drawing", [
+                    [sg.Graph(
+                        canvas_size=(600, 600),
+                        graph_bottom_left=(0, 600),
+                        graph_top_right=(600, 0),
+                        key="-REALTIME_GRAPH-",
+                        background_color="white",
+                        enable_events=True,
+                        expand_x=True, expand_y=True
+                    )]
+                ], key="-TAB_REALTIME_DRAWING-")
+            ]
+        ], key="-PREVIEW_TABGROUP-", expand_x=True, expand_y=True)],
     ]
     
     layout = [
         [
-            sg.Column(controls_column, vertical_alignment="top"),
+            sg.Column(controls_column, vertical_alignment="top", expand_y=True),
             sg.VSeparator(),
-            sg.Column(visual_column, vertical_alignment="top", element_justification="center")
+            sg.Column(visual_column, vertical_alignment="top", element_justification="center", expand_y=True)
         ],
         [sg.HorizontalSeparator()],
         [
