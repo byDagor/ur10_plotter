@@ -19,7 +19,7 @@ import time
 from typing import Union
 
 # --- IMPORTS FOR HATCHED ---
-import hatched              # <-- IMPORT THE NEW hatched.py FILE
+from . import hatched              # <-- IMPORT THE NEW hatched.py FILE
 import cv2                  # <-- Still needed for run_hatched_thread
 import numpy as np          # <-- Still needed for run_hatched_thread
 # ---------------------------

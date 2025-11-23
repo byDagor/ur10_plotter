@@ -45,6 +45,7 @@ def main():
     document: Union[vpype.Document, None] = None
     ur10_controller: Union[UR10Controller, None] = None
     svg_path_list = []
+    scaled_dims = {"width": 0, "height": 0}
     update_preview(window, None, is_cmyk=False) # Pass default CMYK flag
 
     # --- Event Loop ---
@@ -389,6 +390,8 @@ def main():
                                 svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz,
                                 canvas_width_mm, canvas_height_mm, dry_run, corner
                             )
+                            scaled_dims["width"] = width
+                            scaled_dims["height"] = height
                             
                             if path:
                                 window["-BTN_START-"].update(disabled=True)
@@ -396,21 +399,9 @@ def main():
                                 window["-BTN_STOP-"].update(disabled=False)
                                 window["-REALTIME_GRAPH-"].erase()
 
-                                graph_size = window["-REALTIME_GRAPH-"].CanvasSize
-                                
-                                def transform_coordinates(x, y):
-                                    # Normalize robot coordinates (0-1)
-                                    norm_x = (x - home_x) / width
-                                    norm_y = (y - home_y) / height
-                                    
-                                    # Scale to graph size
-                                    graph_x = norm_x * graph_size[0]
-                                    graph_y = graph_size[1] - (norm_y * graph_size[1]) # Invert Y-axis
-                                    return graph_x, graph_y
-
                                 threading.Thread(
                                     target=ur10_controller.execute_path_realtime,
-                                    args=(path, home_pose, speed_control, window),
+                                    args=(path, home_pose, speed_control, window, dry_run),
                                     daemon=True
                                 ).start()
                             else:
@@ -425,6 +416,39 @@ def main():
 
                 elif event == "-DRAW_LINE-":
                     start_point, end_point = values[event]
+                    
+                    graph_size = window["-REALTIME_GRAPH-"].CanvasSize
+                    width = scaled_dims["width"]
+                    height = scaled_dims["height"]
+                    corner = values["-CANVAS_CORNER-"]
+                    home_x, home_y = home_pose[0], home_pose[1]
+                    
+                    def transform_coordinates(x, y):
+                        # Determine bounding box based on corner
+                        if corner == "Top Left":
+                            min_x, max_x = home_x, home_x + width
+                            min_y, max_y = home_y - height, home_y
+                        elif corner == "Top Right":
+                            min_x, max_x = home_x - width, home_x
+                            min_y, max_y = home_y - height, home_y
+                        elif corner == "Bottom Left":
+                            min_x, max_x = home_x, home_x + width
+                            min_y, max_y = home_y, home_y + height
+                        elif corner == "Bottom Right":
+                            min_x, max_x = home_x - width, home_x
+                            min_y, max_y = home_y, home_y + height
+                        else: # Default to Top Left
+                            min_x, max_x = home_x, home_x + width
+                            min_y, max_y = home_y - height, home_y
+
+                        # Normalize robot coordinates (0-1)
+                        norm_x = (x - min_x) / (max_x - min_x) if (max_x - min_x) != 0 else 0
+                        norm_y = (y - min_y) / (max_y - min_y) if (max_y - min_y) != 0 else 0
+                        
+                        # Scale to graph size
+                        graph_x = norm_x * graph_size[0]
+                        graph_y = graph_size[1] - (norm_y * graph_size[1]) # Invert Y-axis
+                        return graph_x, graph_y
                     
                     x1, y1 = transform_coordinates(start_point[0], start_point[1])
                     x2, y2 = transform_coordinates(end_point[0], end_point[1])

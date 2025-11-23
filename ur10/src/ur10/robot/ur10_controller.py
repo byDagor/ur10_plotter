@@ -4,7 +4,7 @@ import threading
 import numpy as np
 
 class UR10Controller:
-    def __init__(self, ip_address="192.168.0.11"):
+    def __init__(self, ip_address="10.0.10.208"):
         self.ip_address = ip_address
         self.rtde_c = None
         self.rtde_r = None
@@ -57,13 +57,14 @@ class UR10Controller:
         except Exception as e:
             print(f"Error moving the robot: {e}")
 
-    def execute_path_realtime(self, path, home_pose, speed_control, window):
+    def execute_path_realtime(self, paths, home_pose, speed_control, window, dry_run=False):
         """
-        Executes a list of poses in real-time, allowing for on-the-fly speed changes.
-        :param path: A list of poses.
+        Executes a list of paths, allowing for pause and stop.
+        :param paths: A list of paths, where each path is a list of poses.
         :param home_pose: The starting and ending pose.
         :param speed_control: A mutable object (e.g., a list) containing the speed value.
         :param window: The PySimpleGUI window object.
+        :param dry_run: If True, pen up/down moves are skipped.
         """
         if not self.is_connected:
             print("Not connected to the robot.")
@@ -72,62 +73,60 @@ class UR10Controller:
         self.stop_event.clear()
         self.pause_event.clear()
         
-        print("Executing real-time path...")
+        print("Executing path...")
         self.go_home(home_pose)
+        safe_z = home_pose[2] + 0.02  # Safe height for pen-up moves
 
-        for i in range(len(path) - 1):
-            if self.stop_event.is_set():
-                break
+        for path in paths:
+            if not path: continue
+            if self.stop_event.is_set(): break
 
-            # --- Pause Logic ---
-            if self.pause_event.is_set():
-                self.rtde_c.speedStop()
-                
-                # Get current position and lift the pen
-                paused_pose = self.get_current_pose()
-                pen_up_pose = paused_pose.copy()
-                pen_up_pose[2] += 0.02  # Lift pen by 20mm
-                self.move_to(pen_up_pose, speed=0.5)
-                
-                # Wait until the pause is cleared
-                self.pause_event.wait() 
-                
-                # Move back to the paused position
-                self.move_to(paused_pose, speed=0.5)
+            start_pose = path[0]
+            # Move to the start of the path with pen up
+            if not dry_run:
+                start_pose_up = list(start_pose)
+                start_pose_up[2] = safe_z
+                self.move_to(start_pose_up, speed=speed_control[0])
 
-            start_point = np.array(path[i][:3])
-            end_point = np.array(path[i+1][:3])
+            # Move to the start point (pen down if not dry run)
+            self.move_to(start_pose, speed=speed_control[0])
             
-            direction = end_point - start_point
-            distance = np.linalg.norm(direction)
-            if distance == 0:
-                continue
-            
-            direction_unit = direction / distance
-            
-            while not self.stop_event.is_set():
+            # Draw the path
+            for i in range(len(path) - 1):
+                if self.stop_event.is_set(): break
+                
+                # --- Pause Logic ---
                 if self.pause_event.is_set():
-                    break
+                    print("Path execution paused.")
+                    paused_pose = self.get_current_pose()
+                    if not dry_run:
+                        pen_up_pose = paused_pose.copy()
+                        if pen_up_pose[2] < safe_z: # only lift if it's drawing
+                            pen_up_pose[2] = safe_z
+                            self.move_to(pen_up_pose, speed=0.5)
+                    
+                    self.pause_event.wait() # Wait for resume
+                    print("Resuming path execution.")
+                    
+                    if not dry_run and paused_pose[2] < safe_z:
+                        self.move_to(paused_pose, speed=0.5)
+                
+                next_pose = path[i+1]
+                self.move_to(next_pose, speed=speed_control[0])
+                window.write_event_value("-DRAW_LINE-", (path[i], next_pose))
 
-                current_pose_np = np.array(self.get_current_pose()[:3])
-                remaining_distance = np.linalg.norm(end_point - current_pose_np)
-                
-                if remaining_distance < 0.001: # 1mm threshold
-                    break
-                
-                speed = speed_control[0]
-                velocity_vector = direction_unit * speed
-                
-                velocity_command = np.append(velocity_vector, [0, 0, 0])
-                
-                self.rtde_c.speedL(velocity_command.tolist(), 1.0)
-            
-            window.write_event_value("-DRAW_LINE-", (path[i], path[i+1]))
+            if self.stop_event.is_set(): break
 
-        self.rtde_c.speedStop()
+            # Lift the pen at the end of the path
+            end_pose = path[-1]
+            if not dry_run:
+                end_pose_up = list(end_pose)
+                end_pose_up[2] = safe_z
+                self.move_to(end_pose_up, speed=speed_control[0])
+
         self.go_home(home_pose)
         window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
-        print("Real-time path execution complete.")
+        print("Path execution complete.")
 
     def go_home(self, home_pose):
         """

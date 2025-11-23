@@ -144,7 +144,7 @@ def create_layout():
     ur10_controls = [
         [sg.Text("UR10 Robot Control", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
-        [sg.Text("Robot IP:", s=(15, 1)), sg.Input("192.168.0.11", key="-UR10_IP-", s=(20, 1))],
+        [sg.Text("Robot IP:", s=(15, 1)), sg.Input("10.0.10.208", key="-UR10_IP-", s=(20, 1))],
         [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1)), sg.FileBrowse(target="-SVG_PATH-")],
@@ -166,7 +166,7 @@ def create_layout():
             sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-CANVAS_WIDTH-", s=(10, 1)),
             sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))
         ],
-        [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.1, 1.0), default_value=0.25, resolution=0.05, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
+        [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.01, 1.0), default_value=0.10, resolution=0.01, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
         [
             sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")),
