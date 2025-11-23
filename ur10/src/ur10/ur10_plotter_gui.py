@@ -1,6 +1,5 @@
 import FreeSimpleGUI as sg
 import vpype
-import vpype_flow_imager  # This import is enough to register the plugin
 from vpype_cli import execute
 
 import os
@@ -55,6 +54,10 @@ def main():
 
             if event == sg.WIN_CLOSED:
                 break
+            
+            if event == "-LOG_MESSAGE-":
+                window["-LOG-"].print(values[event])
+                continue
             
             try:
                 # --- Vectorize Image Event ---
@@ -133,12 +136,7 @@ def main():
                     cmd_string += f" \"{img_path}\""
                     
                     # --- THREADING LOGIC ---
-                    # 1. Disable buttons and show loading text
-                    window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
-                    window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
-                    window["-BTN_OPTIMIZE-"].update(disabled=True)
-                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=True)
-                    window["-LOG-"].print("Processing... please wait.")
+                    window["-LOG-"].print("Starting Flow Imager vectorization... please wait.")
                     
                     # 2. Start the worker thread
                     threading.Thread(
@@ -215,11 +213,7 @@ def main():
                     # --- END PARSING ---
                     
                     # --- THREADING LOGIC ---
-                    window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
-                    window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
-                    window["-BTN_OPTIMIZE-"].update(disabled=True)
-                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=True)
-                    window["-LOG-"].print("Processing... please wait.")
+                    window["-LOG-"].print("Starting Hatched vectorization... please wait.")
                     
                     threading.Thread(
                         target=run_hatched_thread, # Call the thread function
@@ -230,8 +224,16 @@ def main():
                 # --- Event for when the thread is done ---
                 elif event == "-THREAD_DONE-":
                     # 1. Get results from the event
-                    doc_from_thread, error_message, is_cmyk = values[event]
+                    doc_from_thread, message, is_cmyk = values[event]
                     
+                    # Check if this is from the robot thread
+                    if message == "Real-time path execution complete.":
+                        window["-UR10_STATUS-"].print(message)
+                        window["-BTN_START-"].update(disabled=False)
+                        window["-BTN_PAUSE-"].update(text="Pause", disabled=True)
+                        window["-BTN_STOP-"].update(disabled=True)
+                        continue
+
                     # 2. Re-enable buttons and hide loading text
                     window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
@@ -239,16 +241,16 @@ def main():
                     window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=False)
                     
                     # 3. Handle results
-                    if error_message:
-                        print(f"Thread Error: {error_message}")
-                        sg.popup_error(f"Vectorization Failed:\n\n{error_message}")
+                    if message and message != "Flow Imager vectorization complete." and message != "Hatched vectorization complete.":
+                        print(f"Thread Error: {message}")
+                        sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
                         document = doc_from_thread  # Store the new document
-                        print("Thread finished. Updating preview.")
+                        window["-LOG-"].print(message)
                         # Pass the checkbox value to the preview function
                         update_preview(window, document, is_cmyk=is_cmyk)
                     else:
-                        print("Thread finished but document is empty.")
+                        window["-LOG-"].print("Thread finished but document is empty.")
                         document = None # Clear the old document
                         update_preview(window, None, is_cmyk=False) # Show a blank screen
                 
@@ -258,7 +260,7 @@ def main():
                         print("No drawing to optimize. Generate or vectorize first.")
                         continue
                     
-                    print("Optimizing drawing...")
+                    window["-LOG-"].print("Optimizing drawing... please wait.")
                     
                     if event == "-BTN_OPTIMIZE-":
                         merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
@@ -274,7 +276,7 @@ def main():
                     document = execute(cmd_string, document=document)
                     
                     if document:
-                        print("Optimization complete. Updating preview.")
+                        window["-LOG-"].print("Optimization complete. Updating preview.")
                         
                         # Check which tab is active to get the right CMYK value
                         active_tab_key = values["-TABGROUP-"]
@@ -286,7 +288,7 @@ def main():
                             
                         update_preview(window, document, is_cmyk=is_cmyk)
                     else:
-                        print("Optimization failed.")
+                        window["-LOG-"].print("Optimization failed.")
 
                 # --- Save Event ---
                 elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-"):
@@ -304,15 +306,15 @@ def main():
 
                     if save_path:
                         try:
-                            print(f"Saving to {save_path}...")
+                            window["-LOG-"].print(f"Saving SVG to {save_path}...")
                             with open(save_path, "w", encoding="utf-8") as f:
                                 vpype.write_svg(f, document)
-                            print("File saved successfuly.")
+                            window["-LOG-"].print("SVG file saved successfully.")
                         except Exception as e:
                             print(f"Error saving file: {e}")
                             sg.popup_error(f"Error saving file: {e}")
                     else:
-                        print("Save cancelled.")
+                        window["-LOG-"].print("SVG save cancelled.")
                 
                 # --- UR10 Control Events ---
                 elif event == "-BTN_UR10_CONNECT-":
@@ -323,7 +325,7 @@ def main():
                         if ur10_controller.connect():
                             window["-UR10_STATUS-"].print("Successfully connected.")
                             window["-BTN_UR10_CONNECT-"].update(text="Disconnect")
-                            window["-BTN_SEND_SVG-"].update(disabled=False)
+                            window["-BTN_START-"].update(disabled=False)
                             window["-BTN_UR10_HOME-"].update(disabled=False)
                             window["-BTN_SET_HOME-"].update(disabled=False)
                         else:
@@ -333,7 +335,9 @@ def main():
                         ur10_controller.disconnect()
                         window["-UR10_STATUS-"].print("Disconnected.")
                         window["-BTN_UR10_CONNECT-"].update(text="Connect to UR10")
-                        window["-BTN_SEND_SVG-"].update(disabled=True)
+                        window["-BTN_START-"].update(disabled=True)
+                        window["-BTN_PAUSE-"].update(disabled=True)
+                        window["-BTN_STOP-"].update(disabled=True)
                         window["-BTN_UR10_HOME-"].update(disabled=True)
                         window["-BTN_SET_HOME-"].update(disabled=True)
                         ur10_controller = None
@@ -359,7 +363,7 @@ def main():
                     else:
                         window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
-                elif event == "-BTN_SEND_SVG-":
+                elif event == "-BTN_START-":
                     if ur10_controller and ur10_controller.is_connected:
                         svg_file = values["-SVG_PATH-"]
                         if not svg_file or not os.path.exists(svg_file):
@@ -371,7 +375,8 @@ def main():
                             continue
 
                         try:
-                            scale = float(values["-SVG_SCALE-"])
+                            canvas_width_mm = float(values["-CANVAS_WIDTH-"])
+                            canvas_height_mm = float(values["-CANVAS_HEIGHT-"])
                             dry_run = values["-DRY_RUN-"]
                             corner = values["-CANVAS_CORNER-"]
                             
@@ -380,10 +385,14 @@ def main():
                             window["-UR10_STATUS-"].print(f"Parsing SVG file: {svg_file}")
                             home_x, home_y, home_z, home_rx, home_ry, home_rz = home_pose
                             
-                            path, width, height = parse_svg(svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz, scale, dry_run, corner)
+                            path, width, height = parse_svg(
+                                svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz,
+                                canvas_width_mm, canvas_height_mm, dry_run, corner
+                            )
                             
                             if path:
-                                window["-BTN_SEND_SVG-"].update(disabled=True)
+                                window["-BTN_START-"].update(disabled=True)
+                                window["-BTN_PAUSE-"].update(disabled=False)
                                 window["-BTN_STOP-"].update(disabled=False)
                                 window["-REALTIME_GRAPH-"].erase()
 
@@ -408,7 +417,7 @@ def main():
                                 window["-UR10_STATUS-"].print("Error: Could not parse SVG path.")
 
                         except ValueError:
-                            window["-UR10_STATUS-"].print("Error: Invalid scale value.")
+                            window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height. Please enter numbers.")
                         except Exception as e:
                             window["-UR10_STATUS-"].print(f"An error occurred: {e}")
                     else:
@@ -422,11 +431,24 @@ def main():
 
                     window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
 
+                elif event == "-BTN_PAUSE-":
+                    if ur10_controller and ur10_controller.is_connected:
+                        if not ur10_controller.pause_event.is_set():
+                            ur10_controller.pause_event.set()
+                            window["-BTN_PAUSE-"].update(text="Resume")
+                            window["-UR10_STATUS-"].print("Plotting paused.")
+                        else:
+                            ur10_controller.pause_event.clear()
+                            window["-BTN_PAUSE-"].update(text="Pause")
+                            window["-UR10_STATUS-"].print("Plotting resumed.")
+
                 elif event == "-BTN_STOP-":
                     if ur10_controller and ur10_controller.is_connected:
                         ur10_controller.stop_event.set()
-                        window["-BTN_SEND_SVG-"].update(disabled=False)
+                        window["-BTN_START-"].update(disabled=False)
+                        window["-BTN_PAUSE-"].update(text="Pause", disabled=True)
                         window["-BTN_STOP-"].update(disabled=True)
+                        window["-UR10_STATUS-"].print("Plotting stopped by user.")
 
                 elif event == "-BTN_UR10_HOME-":
                     if ur10_controller and ur10_controller.is_connected:

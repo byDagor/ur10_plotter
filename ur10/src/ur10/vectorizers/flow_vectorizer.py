@@ -9,14 +9,16 @@ def run_vectorize_thread(window: sg.Window, cmd_string: str, is_cmyk: bool):
     event back to the main GUI loop when finished.
     """
     try:
+        window.write_event_value("-LOG_MESSAGE-", "Starting Flow Imager vectorization...")
         print(f"Running command: vpype {cmd_string}")
         start_time = time.time()
+        window.write_event_value("-LOG_MESSAGE-", "Applying vpype commands...")
         document = execute(cmd_string)
         end_time = time.time()
-        print(f"Vectorization complete in {end_time - start_time:.2f} seconds.")
+        window.write_event_value("-LOG_MESSAGE-", f"Flow Imager vectorization complete in {end_time - start_time:.2f} seconds.")
         
         # Send an event to the main thread with the result
-        window.write_event_value("-THREAD_DONE-", (document, None, is_cmyk))
+        window.write_event_value("-THREAD_DONE-", (document, "Flow Imager vectorization complete.", is_cmyk))
         
     except Exception as e:
         print("An error occurred in the vectorization thread:")

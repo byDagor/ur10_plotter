@@ -1,6 +1,5 @@
 import FreeSimpleGUI as sg
 import vpype
-import vpype_flow_imager  # This import is enough to register the plugin
 from vpype_cli import execute  # Correct import for the 'execute' function
 
 # --- MATPLOTLIB IMPORTS ---
@@ -12,19 +11,17 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 import io
 import os
-import shlex  # Used for safely splitting command strings
 from PIL import Image
 import threading  # For running long processes in the background
 import time
 
 # --- Imports for type hinting ---
-from typing import Union, Any, Iterable, Tuple, List
+from typing import Union
 
 # --- IMPORTS FOR HATCHED ---
 import hatched              # IMPORT THE hatched.py FILE
 import cv2                  # Still needed for run_hatched_thread
 import numpy as np          # Still needed for run_hatched_thread
-from skimage import measure # Still needed for run_hatched_thread
 # ---------------------------
 
 

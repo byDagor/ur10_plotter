@@ -2,8 +2,6 @@ import rtde_control
 import rtde_receive
 import frrpc
 import time
-import copy
-import time
 
 
 from xml.dom import minidom

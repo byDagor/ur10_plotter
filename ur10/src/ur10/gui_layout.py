@@ -7,10 +7,6 @@ def create_layout():
     
     sg.theme("DarkGrey2")
     
-    # Define a consistent, shorter height for all tabs to fit on screen
-    TAB_HEIGHT = 450
-    TAB_WIDTH = 500
-    
     # --- Tab 1: Flow Imager ---
     flow_controls = [
         [sg.Text("Vectorize an image using 'flow_imager'.", font="Helvetica 12")],
@@ -130,12 +126,14 @@ def create_layout():
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
         [sg.Text("Connect to UR10:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Connects to the robot at the specified IP address.", size=(DESC_W, None))],
         [sg.Text("SVG File:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The SVG file to be plotted by the robot.", size=(DESC_W, None))],
-        [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Move the robot to the desired home position and click this button to save it.", size=(DESC_W, None))],
+        [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Move the robot so the pen is touching the canvas corner. This sets the 'drawing Z-height'. The robot's actual home will be 20mm above this point.", size=(DESC_W, None))],
         [sg.Text("Canvas Corner:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The corner of the canvas to use as the origin.", size=(DESC_W, None))],
         [sg.Text("SVG Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The scale of the SVG file.", size=(DESC_W, None))],
-        [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("If checked, the robot will not lower the pen to the drawing surface.", size=(DESC_W, None))],
-        [sg.Text("Send SVG to Robot:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Sends the SVG file to the robot for plotting.", size=(DESC_W, None))],
-        [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the saved home position.", size=(DESC_W, None))],
+        [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("If checked, the robot will move at the higher 'home' Z-height, 20mm above the canvas.", size=(DESC_W, None))],
+        [sg.Text("Start Plotting:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Starts the plotting process.", size=(DESC_W, None))],
+        [sg.Text("Pause/Resume:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Pauses the plotting process and lifts the pen. Press again to resume.", size=(DESC_W, None))],
+        [sg.Text("Stop:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Stops the plotting process and returns the robot to its home position.", size=(DESC_W, None))],
+        [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the safe home position (20mm above the canvas).", size=(DESC_W, None))],
     ]
 
     # Create a scrollable column for the instructions
@@ -164,11 +162,17 @@ def create_layout():
                 readonly=True
             )
         ],
-        [sg.Text("SVG Scale:", s=(15, 1)), sg.Input("9", key="-SVG_SCALE-", s=(10, 1))],
+        [
+            sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-CANVAS_WIDTH-", s=(10, 1)),
+            sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))
+        ],
         [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.1, 1.0), default_value=0.25, resolution=0.05, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
-        [sg.Button("Send SVG to Robot", key="-BTN_SEND_SVG-", expand_x=True, disabled=True)],
-        [sg.Button("Stop Plotting", key="-BTN_STOP-", expand_x=True, disabled=True)],
+        [
+            sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")),
+            sg.Button("Pause", key="-BTN_PAUSE-", expand_x=True, disabled=True, button_color=("white", "orange")),
+            sg.Button("Stop", key="-BTN_STOP-", expand_x=True, disabled=True, button_color=("white", "red")),
+        ],
         [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("Status:")],

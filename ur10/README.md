@@ -38,3 +38,19 @@ or
 ```bash
 python src/ur10/ur10_plotter_gui_v1.0.0.py
 ```
+
+## UR10 Plotter Instructions
+
+### UR10 Control
+
+*   **Robot IP:** The IP address of the UR10 robot.
+*   **Connect to UR10:** Connects to the robot at the specified IP address.
+*   **SVG File:** The SVG file to be plotted by the robot.
+*   **Set Home to Current Position:** Move the robot so the pen is touching the canvas corner. This sets the 'drawing Z-height'. The robot's actual home will be 20mm above this point.
+*   **Canvas Corner:** The corner of the canvas to use as the origin.
+*   **SVG Scale:** The scale of the SVG file.
+*   **Dry Run:** If checked, the robot will move at the higher 'home' Z-height, 20mm above the canvas.
+*   **Start Plotting:** Starts the plotting process.
+*   **Pause/Resume:** Pauses the plotting process and lifts the pen. Press again to resume.
+*   **Stop:** Stops the plotting process and returns the robot to its home position.
+*   **Go Home:** Moves the robot to the safe home position (20mm above the canvas).

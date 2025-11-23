@@ -1,6 +1,5 @@
 import FreeSimpleGUI as sg
 import vpype
-import vpype_flow_imager  # This import is enough to register the plugin
 from vpype_cli import execute  # Correct import for the 'execute' function
 
 # --- NEW MATPLOTLIB IMPORTS ---
@@ -12,19 +11,17 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 import io
 import os
-import shlex  # Used for safely splitting command strings
 from PIL import Image
 import threading  # <-- NEW IMPORT FOR THREADING
 import time
 
 # --- Imports for type hinting ---
-from typing import Union, Any, Iterable, Tuple
+from typing import Union
 
 # --- IMPORTS FOR HATCHED ---
 import hatched              # <-- IMPORT THE NEW hatched.py FILE
 import cv2                  # <-- Still needed for run_hatched_thread
 import numpy as np          # <-- Still needed for run_hatched_thread
-from skimage import measure # <-- Still needed for run_hatched_thread
 # ---------------------------
 
 
@@ -501,7 +498,7 @@ def main():
 
                 # Parse levels
                 try:
-                    levels = [int(l) for l in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(l) < 255]
+                    levels = [int(level_str) for level_str in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(level_str) < 255]
                     if not levels:
                         levels = (64, 128, 192) # Default if empty
                     params["levels"] = tuple(levels)

@@ -108,7 +108,6 @@ def _build_diagonal_hatch(delta: float, offset: float, w: int, h: int, angle: fl
 
 
 def _plot_poly(geom, colspec=""):
-    import matplotlib.pyplot as plt
     plt.plot(*geom.exterior.xy, colspec)
     for i in geom.interiors:
         plt.plot(*i.xy, colspec)
@@ -139,7 +138,6 @@ def _build_mask(cnt):
 
 
 def _save_to_svg(file_path: str, w: int, h: int, vectors: Iterable[MultiLineString]) -> None:
-    import svgwrite as svgwrite
     dwg = svgwrite.Drawing(file_path, size=(w, h), profile="tiny", debug=False)
 
     dwg.add(
