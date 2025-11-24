@@ -433,10 +433,10 @@ def main():
                             min_y, max_y = home_y - height, home_y
                         elif corner == "Bottom Left":
                             min_x, max_x = home_x, home_x + width
-                            min_y, max_y = home_y, home_y + height
+                            min_y, max_y = home_y - height, home_y
                         elif corner == "Bottom Right":
                             min_x, max_x = home_x - width, home_x
-                            min_y, max_y = home_y, home_y + height
+                            min_y, max_y = home_y - height, home_y
                         else: # Default to Top Left
                             min_x, max_x = home_x, home_x + width
                             min_y, max_y = home_y - height, home_y

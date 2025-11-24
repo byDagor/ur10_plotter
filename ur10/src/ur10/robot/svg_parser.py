@@ -1,3 +1,4 @@
+import math
 from xml.dom import minidom
 from svg.path import parse_path
 import re
@@ -142,6 +143,10 @@ def parse_svg(
 
         if not elements:
             return [], 0, 0
+
+        angle_rad = math.radians(45)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
             
         for el in elements:
             subpaths = _get_points_from_element(el)
@@ -164,9 +169,9 @@ def parse_svg(
                     elif corner == "Top Right":
                         origin_x, origin_y = start_x - scaled_width_m, start_y
                     elif corner == "Bottom Left":
-                        origin_x, origin_y = start_x, start_y + scaled_height_m
+                        origin_x, origin_y = start_x, start_y
                     elif corner == "Bottom Right":
-                        origin_x, origin_y = start_x - scaled_width_m, start_y + scaled_height_m
+                        origin_x, origin_y = start_x - scaled_width_m, start_y
                     elif corner == "Center":
                         origin_x, origin_y = start_x - scaled_width_m / 2, start_y + scaled_height_m / 2
                     else: # Default to Top Left
@@ -174,9 +179,13 @@ def parse_svg(
 
                     x = origin_x + x_offset_m
                     y = origin_y - y_offset_m
+
+                    # --- 5. Apply 45-degree rotation around the home point ---
+                    x_rotated = start_x + (x - start_x) * cos_a - (y - start_y) * sin_a
+                    y_rotated = start_y + (x - start_x) * sin_a + (y - start_y) * cos_a
                         
                     z = start_z if not dry_run else start_z + 0.02 # Lift pen for dry run
-                    robot_path.append((x, y, z, rx, ry, rz))
+                    robot_path.append((x_rotated, y_rotated, z, rx, ry, rz))
                 if robot_path:
                     all_robot_paths.append(robot_path)
 
