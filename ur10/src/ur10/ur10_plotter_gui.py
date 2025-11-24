@@ -7,6 +7,7 @@ import threading
 from typing import Union
 import cv2
 import json
+import math
 
 from gui_layout import create_layout
 from gui_preview import update_preview
@@ -422,6 +423,20 @@ def main():
                     height = scaled_dims["height"]
                     corner = values["-CANVAS_CORNER-"]
                     home_x, home_y = home_pose[0], home_pose[1]
+
+                    def unrotate_point(p_rotated):
+                        angle_rad = math.radians(-45)
+                        cos_a = math.cos(angle_rad)
+                        sin_a = math.sin(angle_rad)
+                        x_r, y_r = p_rotated[0], p_rotated[1]
+                        
+                        x_unrotated = home_x + (x_r - home_x) * cos_a - (y_r - home_y) * sin_a
+                        y_unrotated = home_y + (x_r - home_x) * sin_a + (y_r - home_y) * cos_a
+                        
+                        return (x_unrotated, y_unrotated)
+
+                    start_unrotated = unrotate_point(start_point)
+                    end_unrotated = unrotate_point(end_point)
                     
                     def transform_coordinates(x, y):
                         # Determine bounding box based on corner
@@ -433,10 +448,10 @@ def main():
                             min_y, max_y = home_y - height, home_y
                         elif corner == "Bottom Left":
                             min_x, max_x = home_x, home_x + width
-                            min_y, max_y = home_y - height, home_y
+                            min_y, max_y = home_y, home_y + height
                         elif corner == "Bottom Right":
                             min_x, max_x = home_x - width, home_x
-                            min_y, max_y = home_y - height, home_y
+                            min_y, max_y = home_y, home_y + height
                         else: # Default to Top Left
                             min_x, max_x = home_x, home_x + width
                             min_y, max_y = home_y - height, home_y
@@ -450,8 +465,8 @@ def main():
                         graph_y = graph_size[1] - (norm_y * graph_size[1]) # Invert Y-axis
                         return graph_x, graph_y
                     
-                    x1, y1 = transform_coordinates(start_point[0], start_point[1])
-                    x2, y2 = transform_coordinates(end_point[0], end_point[1])
+                    x1, y1 = transform_coordinates(start_unrotated[0], start_unrotated[1])
+                    x2, y2 = transform_coordinates(end_unrotated[0], end_unrotated[1])
 
                     window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
 

@@ -169,9 +169,9 @@ def parse_svg(
                     elif corner == "Top Right":
                         origin_x, origin_y = start_x - scaled_width_m, start_y
                     elif corner == "Bottom Left":
-                        origin_x, origin_y = start_x, start_y
+                        origin_x, origin_y = start_x, start_y + scaled_height_m
                     elif corner == "Bottom Right":
-                        origin_x, origin_y = start_x - scaled_width_m, start_y
+                        origin_x, origin_y = start_x - scaled_width_m, start_y + scaled_height_m
                     elif corner == "Center":
                         origin_x, origin_y = start_x - scaled_width_m / 2, start_y + scaled_height_m / 2
                     else: # Default to Top Left
