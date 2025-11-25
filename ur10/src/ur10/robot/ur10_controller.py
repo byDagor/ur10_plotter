@@ -3,6 +3,8 @@ import rtde_receive
 import threading
 import numpy as np
 
+SAFE_Z_OFFSET = 0.01
+
 class UR10Controller:
     def __init__(self, ip_address="10.0.10.208"):
         self.ip_address = ip_address
@@ -57,12 +59,13 @@ class UR10Controller:
         except Exception as e:
             print(f"Error moving the robot: {e}")
 
-    def execute_path_realtime(self, paths, home_pose, speed_control, window, dry_run=False):
+    def execute_path_realtime(self, paths, home_pose, speed_control, acceleration, window, dry_run=False):
         """
         Executes a list of paths, allowing for pause and stop.
         :param paths: A list of paths, where each path is a list of poses.
         :param home_pose: The starting and ending pose.
         :param speed_control: A mutable object (e.g., a list) containing the speed value.
+        :param acceleration: The acceleration of the robot.
         :param window: The PySimpleGUI window object.
         :param dry_run: If True, pen up/down moves are skipped.
         """
@@ -74,8 +77,8 @@ class UR10Controller:
         self.pause_event.clear()
         
         print("Executing path...")
-        self.go_home(home_pose)
-        safe_z = home_pose[2] + 0.02  # Safe height for pen-up moves
+        self.go_home(home_pose, acceleration=acceleration)
+        safe_z = home_pose[2] + SAFE_Z_OFFSET  # Safe height for pen-up moves
 
         for path in paths:
             if not path: continue
@@ -86,10 +89,10 @@ class UR10Controller:
             if not dry_run:
                 start_pose_up = list(start_pose)
                 start_pose_up[2] = safe_z
-                self.move_to(start_pose_up, speed=speed_control[0])
+                self.move_to(start_pose_up, speed=speed_control[0], acceleration=acceleration)
 
             # Move to the start point (pen down if not dry run)
-            self.move_to(start_pose, speed=speed_control[0])
+            self.move_to(start_pose, speed=speed_control[0], acceleration=acceleration)
             
             # Draw the path
             for i in range(len(path) - 1):
@@ -103,16 +106,16 @@ class UR10Controller:
                         pen_up_pose = paused_pose.copy()
                         if pen_up_pose[2] < safe_z: # only lift if it's drawing
                             pen_up_pose[2] = safe_z
-                            self.move_to(pen_up_pose, speed=0.5)
+                            self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
                     
                     self.pause_event.wait() # Wait for resume
                     print("Resuming path execution.")
                     
                     if not dry_run and paused_pose[2] < safe_z:
-                        self.move_to(paused_pose, speed=0.5)
+                        self.move_to(paused_pose, speed=0.5, acceleration=acceleration)
                 
                 next_pose = path[i+1]
-                self.move_to(next_pose, speed=speed_control[0])
+                self.move_to(next_pose, speed=speed_control[0], acceleration=acceleration)
                 window.write_event_value("-DRAW_LINE-", (path[i], next_pose))
 
             if self.stop_event.is_set(): break
@@ -122,20 +125,36 @@ class UR10Controller:
             if not dry_run:
                 end_pose_up = list(end_pose)
                 end_pose_up[2] = safe_z
-                self.move_to(end_pose_up, speed=speed_control[0])
+                self.move_to(end_pose_up, speed=speed_control[0], acceleration=acceleration)
 
-        self.go_home(home_pose)
+        self.go_home(home_pose, acceleration=acceleration)
         window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
         print("Path execution complete.")
 
-    def go_home(self, home_pose):
+    def go_home(self, home_pose, speed=0.5, acceleration=1.2):
         """
-        Moves the robot to the home position (20mm above the canvas).
+        Moves the robot to the home position (SAFE_Z_OFFSET above the canvas).
         """
         if self.is_connected and home_pose:
             safe_home_pose = home_pose.copy()
-            safe_home_pose[2] += 0.02  # 20mm higher
-            self.move_to(safe_home_pose, speed=0.5)
+            safe_home_pose[2] += SAFE_Z_OFFSET
+            self.move_to(safe_home_pose, speed=speed, acceleration=acceleration)
+
+    def execute_move_sequence(self, poses, speed=0.25, acceleration=1.2):
+        """
+        Moves the robot through a sequence of poses.
+        :param poses: A list of poses for the robot to move to.
+        :param speed: The speed of the robot in m/s.
+        :param acceleration: The acceleration of the robot.
+        """
+        if not self.is_connected:
+            print("Not connected to the robot.")
+            return
+        
+        print("Executing move sequence...")
+        for pose in poses:
+            self.move_to(pose, speed=speed, acceleration=acceleration)
+        print("Move sequence complete.")
 
     def get_current_pose(self):
         """

@@ -61,7 +61,9 @@ def parse_svg(
     canvas_width_mm: float,
     canvas_height_mm: float,
     dry_run: bool = False,
-    corner: str = "Top Left"
+    corner: str = "Top Left",
+    safe_z_offset: float = 0.01,
+    rotation_angle: int = 0
 ):
     """
     Parses an SVG file, scales it to fit the canvas, and converts path data into robot poses.
@@ -78,6 +80,8 @@ def parse_svg(
     :param canvas_height_mm: The height of the target canvas in millimeters.
     :param dry_run: If True, the Z coordinate will not be modified for drawing.
     :param corner: The corner of the canvas to use as the origin.
+    :param safe_z_offset: The safe height offset for pen-up moves.
+    :param rotation_angle: The global rotation to apply to the drawing.
     :return: A tuple containing a list of paths (each a list of poses), 
              the scaled width (in meters), and the scaled height (in meters).
     """
@@ -120,7 +124,7 @@ def parse_svg(
                  max_y_svg = max(p[1] for p in all_points)
                  svg_width = max_x_svg - min_x_svg
                  svg_height = max_y_svg - min_y_svg
-                 
+        
         # --- Handle cases where SVG has no size ---
         if svg_width == 0 or svg_height == 0:
             print("Warning: SVG width or height is zero. Using 1.0 as scale factor.")
@@ -144,7 +148,7 @@ def parse_svg(
         if not elements:
             return [], 0, 0
 
-        angle_rad = math.radians(45)
+        angle_rad = math.radians(rotation_angle + 45)
         cos_a = math.cos(angle_rad)
         sin_a = math.sin(angle_rad)
             
@@ -180,11 +184,11 @@ def parse_svg(
                     x = origin_x + x_offset_m
                     y = origin_y - y_offset_m
 
-                    # --- 5. Apply 45-degree rotation around the home point ---
+                    # --- 5. Apply rotation around the home point ---
                     x_rotated = start_x + (x - start_x) * cos_a - (y - start_y) * sin_a
                     y_rotated = start_y + (x - start_x) * sin_a + (y - start_y) * cos_a
                         
-                    z = start_z if not dry_run else start_z + 0.02 # Lift pen for dry run
+                    z = start_z if not dry_run else start_z + safe_z_offset # Lift pen for dry run
                     robot_path.append((x_rotated, y_rotated, z, rx, ry, rz))
                 if robot_path:
                     all_robot_paths.append(robot_path)

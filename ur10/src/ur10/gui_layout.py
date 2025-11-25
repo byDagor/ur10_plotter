@@ -163,10 +163,21 @@ def create_layout():
             )
         ],
         [
+            sg.Text("Global Rotation:", s=(15,1)),
+            sg.DropDown(
+                [0, -90, 90, 180],
+                default_value=0,
+                key="-GLOBAL_ROTATION-",
+                s=(20,1),
+                readonly=True
+            )
+        ],
+        [
             sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-CANVAS_WIDTH-", s=(10, 1)),
             sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))
         ],
         [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.01, 1.0), default_value=0.10, resolution=0.01, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
+        [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.1, 2.0), default_value=0.5, resolution=0.1, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
         [
             sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")),
@@ -174,6 +185,7 @@ def create_layout():
             sg.Button("Stop", key="-BTN_STOP-", expand_x=True, disabled=True, button_color=("white", "red")),
         ],
         [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
+        [sg.Button("Check Canvas", key="-BTN_CHECK_CANVAS-", expand_x=True, disabled=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("Status:")],
         [sg.Multiline(key="-UR10_STATUS-", size=(50, 5), autoscroll=True, disabled=True)],

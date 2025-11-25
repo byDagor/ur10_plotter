@@ -13,7 +13,7 @@ from gui_layout import create_layout
 from gui_preview import update_preview
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
-from robot.ur10_controller import UR10Controller
+from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
 from robot.svg_parser import parse_svg
 
 
@@ -330,6 +330,7 @@ def main():
                             window["-BTN_START-"].update(disabled=False)
                             window["-BTN_UR10_HOME-"].update(disabled=False)
                             window["-BTN_SET_HOME-"].update(disabled=False)
+                            window["-BTN_CHECK_CANVAS-"].update(disabled=False)
                         else:
                             window["-UR10_STATUS-"].print("Connection failed.")
                             ur10_controller = None
@@ -342,6 +343,7 @@ def main():
                         window["-BTN_STOP-"].update(disabled=True)
                         window["-BTN_UR10_HOME-"].update(disabled=True)
                         window["-BTN_SET_HOME-"].update(disabled=True)
+                        window["-BTN_CHECK_CANVAS-"].update(disabled=True)
                         ur10_controller = None
 
                 elif event == "-BTN_SET_HOME-":
@@ -381,15 +383,18 @@ def main():
                             canvas_height_mm = float(values["-CANVAS_HEIGHT-"])
                             dry_run = values["-DRY_RUN-"]
                             corner = values["-CANVAS_CORNER-"]
+                            rotation_angle = values["-GLOBAL_ROTATION-"]
                             
                             speed_control = [values["-PLOT_SPEED-"]]
+                            acceleration = values["-PLOT_ACCEL-"]
 
                             window["-UR10_STATUS-"].print(f"Parsing SVG file: {svg_file}")
                             home_x, home_y, home_z, home_rx, home_ry, home_rz = home_pose
                             
                             path, width, height = parse_svg(
                                 svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz,
-                                canvas_width_mm, canvas_height_mm, dry_run, corner
+                                canvas_width_mm, canvas_height_mm, dry_run, corner,
+                                safe_z_offset=SAFE_Z_OFFSET, rotation_angle=rotation_angle
                             )
                             scaled_dims["width"] = width
                             scaled_dims["height"] = height
@@ -402,7 +407,7 @@ def main():
 
                                 threading.Thread(
                                     target=ur10_controller.execute_path_realtime,
-                                    args=(path, home_pose, speed_control, window, dry_run),
+                                    args=(path, home_pose, speed_control, acceleration, window, dry_run),
                                     daemon=True
                                 ).start()
                             else:
@@ -423,9 +428,10 @@ def main():
                     height = scaled_dims["height"]
                     corner = values["-CANVAS_CORNER-"]
                     home_x, home_y = home_pose[0], home_pose[1]
+                    rotation_angle = values["-GLOBAL_ROTATION-"]
 
                     def unrotate_point(p_rotated):
-                        angle_rad = math.radians(-45)
+                        angle_rad = math.radians(-(rotation_angle + 45))
                         cos_a = math.cos(angle_rad)
                         sin_a = math.sin(angle_rad)
                         x_r, y_r = p_rotated[0], p_rotated[1]
@@ -493,10 +499,72 @@ def main():
                     if ur10_controller and ur10_controller.is_connected:
                         if home_pose:
                             window["-UR10_STATUS-"].print("Sending robot to home position...")
-                            ur10_controller.go_home(home_pose)
+                            acceleration = values["-PLOT_ACCEL-"]
+                            ur10_controller.go_home(home_pose, acceleration=acceleration)
                             window["-UR10_STATUS-"].print("Robot is at home.")
                         else:
                             window["-UR10_STATUS-"].print("Error: Home position not set.")
+                    else:
+                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+
+                elif event == "-BTN_CHECK_CANVAS-":
+                    if ur10_controller and ur10_controller.is_connected:
+                        if not home_pose:
+                            window["-UR10_STATUS-"].print("Error: Home position not set.")
+                            continue
+                        
+                        try:
+                            canvas_width_m = float(values["-CANVAS_WIDTH-"]) / 1000.0
+                            canvas_height_m = float(values["-CANVAS_HEIGHT-"]) / 1000.0
+                            corner = values["-CANVAS_CORNER-"]
+                            acceleration = values["-PLOT_ACCEL-"]
+                            rotation_angle = values["-GLOBAL_ROTATION-"]
+                            
+                            hx, hy, hz, hrx, hry, hrz = home_pose
+                            safe_z = hz + SAFE_Z_OFFSET
+
+                            # 1. Calculate un-rotated corner points
+                            if corner == "Top Left":
+                                tl, tr, bl, br = (hx, hy), (hx + canvas_width_m, hy), (hx, hy - canvas_height_m), (hx + canvas_width_m, hy - canvas_height_m)
+                                sequence = [tl, tr, br, bl, tl]
+                            elif corner == "Top Right":
+                                tr, tl, br, bl = (hx, hy), (hx - canvas_width_m, hy), (hx, hy - canvas_height_m), (hx - canvas_width_m, hy - canvas_height_m)
+                                sequence = [tr, br, bl, tl, tr]
+                            elif corner == "Bottom Left":
+                                bl, tl, br, tr = (hx, hy), (hx, hy + canvas_height_m), (hx + canvas_width_m, hy), (hx + canvas_width_m, hy + canvas_height_m)
+                                sequence = [bl, tl, tr, br, bl]
+                            elif corner == "Bottom Right":
+                                br, bl, tr, tl = (hx, hy), (hx - canvas_width_m, hy), (hx, hy + canvas_height_m), (hx - canvas_width_m, hy + canvas_height_m)
+                                sequence = [br, tr, tl, bl, br]
+                            
+                            # 2. Rotate corner points
+                            angle_rad = math.radians(rotation_angle + 45)
+                            cos_a = math.cos(angle_rad)
+                            sin_a = math.sin(angle_rad)
+                            
+                            def rotate_point(p):
+                                px, py = p[0], p[1]
+                                x_rot = hx + (px - hx) * cos_a - (py - hy) * sin_a
+                                y_rot = hy + (px - hx) * sin_a + (py - hy) * cos_a
+                                return (x_rot, y_rot)
+
+                            corners_rotated = [rotate_point(p) for p in sequence]
+                            
+                            # 3. Create list of poses
+                            corner_poses = [(p[0], p[1], safe_z, hrx, hry, hrz) for p in corners_rotated]
+                            
+                            # 4. Execute in a thread
+                            window["-UR10_STATUS-"].print("Moving robot to check canvas corners...")
+                            threading.Thread(
+                                target=ur10_controller.execute_move_sequence,
+                                args=(corner_poses, values["-PLOT_SPEED-"], acceleration),
+                                daemon=True
+                            ).start()
+
+                        except ValueError:
+                            window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height.")
+                        except Exception as e:
+                            window["-UR10_STATUS-"].print(f"An error occurred: {e}")
                     else:
                         window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
