@@ -168,6 +168,7 @@ class UR10Controller:
             window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
             print("Path execution complete.")
         else:
+            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution stopped.", False))
             print("Path execution stopped by user.")
 
     def go_home(self, home_pose, speed=0.5, acceleration=1.2):

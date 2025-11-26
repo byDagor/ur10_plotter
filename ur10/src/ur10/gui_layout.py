@@ -39,6 +39,9 @@ def create_layout():
         [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-", expand_x=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Button("Save SVG", key="-BTN_SAVE-", expand_x=True, button_color=("white", "green"))],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Status:")],
+        [sg.Multiline(key="-LOG_FLOW-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
     ]
     # Make the Flow tab scrollable
     flow_controls_col = [[sg.Column(flow_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
@@ -81,6 +84,9 @@ def create_layout():
         [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-HATCHED-", expand_x=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Button("Save SVG", key="-BTN_SAVE-HATCHED-", expand_x=True, button_color=("white", "green"))],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Status:")],
+        [sg.Multiline(key="-LOG_HATCHED-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
     ]
     # Make the Hatched tab scrollable
     hatched_controls_col = [[sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
@@ -166,7 +172,7 @@ def create_layout():
             sg.Text("Global Rotation:", s=(15,1)),
             sg.DropDown(
                 [0, -90, 90, 180],
-                default_value=0,
+                default_value=90,
                 key="-GLOBAL_ROTATION-",
                 s=(20,1),
                 readonly=True
@@ -177,7 +183,7 @@ def create_layout():
             sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))
         ],
         [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.01, 1.0), default_value=0.10, resolution=0.01, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
-        [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.1, 2.0), default_value=0.5, resolution=0.1, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
+        [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.05, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
         [
             sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")),
@@ -243,18 +249,6 @@ def create_layout():
             sg.Column(controls_column, vertical_alignment="top", expand_y=True),
             sg.VSeparator(),
             sg.Column(visual_column, vertical_alignment="top", element_justification="center", expand_y=True)
-        ],
-        [sg.HorizontalSeparator()],
-        [
-            sg.Text("Log Output:"),
-            sg.Multiline(
-                key="-LOG-", 
-                size=(100, 10), 
-                font="Courier 10", 
-                autoscroll=True, 
-                disabled=True,
-                expand_x=True,
-            )
         ]
     ]
     
