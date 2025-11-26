@@ -82,3 +82,62 @@ def update_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool, m
         bio = io.BytesIO()
         img.save(bio, format='PNG')
         window["-VISUAL-"].update(data=bio.getvalue())
+
+
+def update_svg_preview(window: sg.Window, document: vpype.Document, max_size: tuple = (600, 600)):
+    """
+    Renders a vpype.Document to a PNG for the SVG preview tab.
+    Lines are always rendered in black.
+    """
+    
+    # 1. Create a matplotlib Figure and Axes
+    dpi = 100
+    fig = Figure(figsize=(max_size[0] / dpi, max_size[1] / dpi), dpi=dpi)
+    ax = fig.add_axes([0, 0, 1, 1]) # Use full figure area
+    ax.axis('off') # Hide the axes
+    ax.set_facecolor('white')
+    fig.set_facecolor('white')
+
+    if document is None or document.is_empty():
+        pass
+
+    else:
+        try:
+            # 2. Get bounds and set plot limits
+            bounds = document.bounds()
+            if bounds:
+                min_x, min_y, max_x, max_y = bounds
+                ax.set_xlim(min_x, max_x)
+                ax.set_ylim(min_y, max_y)
+                ax.invert_yaxis()
+                ax.set_aspect('equal', adjustable='box')
+            
+            # 3. Plot every line from the document in black
+            for layer_id, line_collection in document.layers.items():
+                for line in line_collection:
+                    x_data = [p.real for p in line]
+                    y_data = [p.imag for p in line]
+                    ax.plot(x_data, y_data, color='black', linewidth=0.5)
+
+        except Exception as e:
+            print(f"Error during Matplotlib rendering for SVG preview: {e}")
+            pass
+
+    # 4. Render the figure to a PNG buffer
+    try:
+        canvas = FigureCanvas(fig)
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        img = Image.frombytes("RGBA", canvas.get_width_height(), buf)
+        png_buffer = io.BytesIO()
+        img.save(png_buffer, format="PNG")
+        
+        # 5. Update the GUI
+        window["-SVG_PREVIEW_IMAGE-"].update(data=png_buffer.getvalue())
+
+    except Exception as e:
+        print(f"Error saving Matplotlib canvas to PNG for SVG preview: {e}")
+        img = Image.new('RGB', max_size, color='white')
+        bio = io.BytesIO()
+        img.save(bio, format='PNG')
+        window["-SVG_PREVIEW_IMAGE-"].update(data=bio.getvalue())

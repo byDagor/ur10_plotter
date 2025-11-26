@@ -13,7 +13,7 @@ def create_layout():
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_FLOW-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_FLOW-")],
         
-        [sg.Text("Noise Coeff:", s=(15, 1)), sg.Input("0.01", key="-FLOW_NOISE-", s=(10, 1))],
+        [sg.Text("Noise Coeff:", s=(15, 1)), sg.Input("0.0005", key="-FLOW_NOISE-", s=(10, 1))],
         [sg.Text("Min Separation:", s=(15, 1)), sg.Slider(range=(0.5, 10), default_value=0.8, resolution=0.1, orientation="h", key="-FLOW_MIN_SEP-", s=(30, 20))],
         [sg.Text("Max Separation:", s=(15, 1)), sg.Slider(range=(1, 20), default_value=10.0, resolution=0.1, orientation="h", key="-FLOW_MAX_SEP-", s=(30, 20))],
         
@@ -159,7 +159,7 @@ def create_layout():
         [sg.Text("Robot IP:", s=(15, 1)), sg.Input("10.0.10.208", key="-UR10_IP-", s=(20, 1))],
         [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
         [sg.HorizontalSeparator()],
-        [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1)), sg.FileBrowse(target="-SVG_PATH-")],
+        [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1), enable_events=True), sg.FileBrowse(target="-SVG_PATH-")],
         [sg.Text("Home Position:", s=(15,1)), sg.Input("Not Set", key="-HOME_POSE_DISPLAY-", s=(30,1), disabled=True)],
         [
             sg.Button("Set Home to Current Position", key="-BTN_SET_HOME-", expand_x=True, disabled=True),
@@ -235,6 +235,9 @@ def create_layout():
                     )],
                     [sg.Image(key="-VISUAL-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]
                 ], key="-TAB_FINAL_PREVIEW-"),
+                sg.Tab("SVG Preview", [
+                    [sg.Image(key="-SVG_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]
+                ], key="-TAB_SVG_PREVIEW-"),
                 sg.Tab("Real-time Drawing", [
                     [sg.Graph(
                         canvas_size=(600, 600),

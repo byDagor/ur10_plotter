@@ -10,7 +10,7 @@ import json
 import math
 
 from gui_layout import create_layout
-from gui_preview import update_preview
+from gui_preview import update_preview, update_svg_preview
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
@@ -156,7 +156,7 @@ def main():
                     # 2. Start the worker thread
                     threading.Thread(
                         target=run_vectorize_thread,
-                        args=(window, cmd_string, cmyk), # Pass the CMYK flag
+                        args=(window, cmd_string, cmyk, stop_flow_event), # Pass the CMYK flag and stop event
                         daemon=True
                     ).start()
                     # -----------------------------
@@ -301,6 +301,24 @@ def main():
                     window["-BTN_STOP_HATCHED-"].update(disabled=True)
                     window["-LOG_HATCHED-"].print("Hatched vectorization stopped by user.")
 
+                # --- SVG Preview Event ---
+                elif event == "-SVG_PATH-":
+                    file_path = values["-SVG_PATH-"]
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            # Load the SVG into a document
+                            doc = execute(f'read "{file_path}"')
+                            # Update the preview image
+                            update_svg_preview(window, doc)
+                            # Switch to the preview tab
+                            window["-TAB_SVG_PREVIEW-"].select()
+                        except Exception as e:
+                            print(f"Error loading SVG for preview: {e}")
+                            # Clear the preview if loading fails
+                            update_svg_preview(window, None)
+                    else:
+                        # Clear the preview if path is invalid
+                        update_svg_preview(window, None)
                 
                 # --- Optimize Event ---
                 elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-"):
