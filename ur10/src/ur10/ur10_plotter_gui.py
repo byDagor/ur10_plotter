@@ -25,6 +25,9 @@ def main():
     layout = create_layout()
     window = sg.Window("PLOTTUR10", layout, finalize=True, resizable=True)
     
+    stop_flow_event = threading.Event()
+    stop_hatched_event = threading.Event()
+    
     # Load home position from config file
     home_pose = None
     try:
@@ -146,6 +149,9 @@ def main():
                     
                     # --- THREADING LOGIC ---
                     window["-LOG_FLOW-"].print("Starting Flow Imager vectorization... please wait.")
+                    stop_flow_event.clear()
+                    window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
+                    window["-BTN_STOP_FLOW-"].update(disabled=False)
                     
                     # 2. Start the worker thread
                     threading.Thread(
@@ -223,10 +229,13 @@ def main():
                     
                     # --- THREADING LOGIC ---
                     window["-LOG_HATCHED-"].print("Starting Hatched vectorization... please wait.")
+                    stop_hatched_event.clear()
+                    window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
+                    window["-BTN_STOP_HATCHED-"].update(disabled=False)
                     
                     threading.Thread(
                         target=run_hatched_thread, # Call the thread function
-                        args=(window, params),      # Pass the parsed params dict
+                        args=(window, params, stop_hatched_event),      # Pass the parsed params dict and stop event
                         daemon=True
                     ).start()
 
@@ -245,14 +254,24 @@ def main():
                         window["-BTN_CHECK_CANVAS-"].update(disabled=False)
                         continue
 
+                    # Check if the task was stopped by the user
+                    if "Flow Imager" in message and stop_flow_event.is_set():
+                        # This was a stale event from a stopped thread, ignore it
+                        continue
+                    if "Hatched" in message and stop_hatched_event.is_set():
+                        # This was a stale event from a stopped thread, ignore it
+                        continue
+
                     # 2. Re-enable buttons and hide loading text
-                    window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
-                    window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
-                    window["-BTN_OPTIMIZE-"].update(disabled=False)
-                    window["-BTN_OPTIMIZE-HATCHED-"].update(disabled=False)
+                    if "Flow Imager" in message:
+                        window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
+                        window["-BTN_STOP_FLOW-"].update(disabled=True)
+                    elif "Hatched" in message:
+                        window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
+                        window["-BTN_STOP_HATCHED-"].update(disabled=True)
                     
                     # 3. Handle results
-                    if message and message != "Flow Imager vectorization complete." and message != "Hatched vectorization complete.":
+                    if message not in ("Flow Imager vectorization complete.", "Hatched vectorization complete."):
                         print(f"Thread Error: {message}")
                         sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
@@ -268,6 +287,20 @@ def main():
                         window[log_key].print("Thread finished but document is empty.")
                         document = None # Clear the old document
                         update_preview(window, None, is_cmyk=False) # Show a blank screen
+                
+                # --- Vectorizer Stop Events ---
+                elif event == "-BTN_STOP_FLOW-":
+                    stop_flow_event.set()
+                    window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
+                    window["-BTN_STOP_FLOW-"].update(disabled=True)
+                    window["-LOG_FLOW-"].print("Flow Imager vectorization stopped by user.")
+
+                elif event == "-BTN_STOP_HATCHED-":
+                    stop_hatched_event.set()
+                    window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
+                    window["-BTN_STOP_HATCHED-"].update(disabled=True)
+                    window["-LOG_HATCHED-"].print("Hatched vectorization stopped by user.")
+
                 
                 # --- Optimize Event ---
                 elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-"):

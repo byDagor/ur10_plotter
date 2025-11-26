@@ -31,7 +31,10 @@ def create_layout():
             sg.Checkbox("K-d Tree (`-kdt`)", key="-FLOW_KDT-", default=False),
             sg.Checkbox("Trim Border (`-tm`)", key="-FLOW_TRIM-", default=False),
         ],
-        [sg.Button("Vectorize with Flow Imager", key="-BTN_VECTORIZE_FLOW-", expand_x=True, font="Helvetica 10 bold")],
+        [
+            sg.Button("Vectorize with Flow Imager", key="-BTN_VECTORIZE_FLOW-", expand_x=True, font="Helvetica 10 bold"),
+            sg.Button("Stop", key="-BTN_STOP_FLOW-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
+        ],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
         [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-", s=(10, 1))],
@@ -76,7 +79,10 @@ def create_layout():
             sg.Checkbox("Draw Contours", key="-HATCHED_LINES-", default=True),
             sg.Checkbox("Draw Hatch Fill", key="-HATCHED_HATCH-", default=True),
         ],
-        [sg.Button("Vectorize with Hatched", key="-BTN_VECTORIZE_HATCHED-", expand_x=True, font="Helvetica 10 bold")],
+        [
+            sg.Button("Vectorize with Hatched", key="-BTN_VECTORIZE_HATCHED-", expand_x=True, font="Helvetica 10 bold"),
+            sg.Button("Stop", key="-BTN_STOP_HATCHED-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
+        ],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
         [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-HATCHED-", s=(10, 1))],

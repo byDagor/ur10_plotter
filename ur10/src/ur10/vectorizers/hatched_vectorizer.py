@@ -5,7 +5,7 @@ import numpy as np
 import time
 import traceback
 
-def run_hatched_thread(window: sg.Window, params: dict):
+def run_hatched_thread(window: sg.Window, params: dict, stop_event: "threading.Event"):
     """
     Runs the 'hatch' function in a separate thread and sends the
     resulting document back to the main GUI loop.
@@ -40,6 +40,7 @@ def run_hatched_thread(window: sg.Window, params: dict):
             center=params["center"],
             hatch_angle=params["angle"],
             offset=params["offset"],
+            stop_event=stop_event,
         )
         print("Hatch thread: Hatch patterns built.")
         
@@ -70,6 +71,8 @@ def run_hatched_thread(window: sg.Window, params: dict):
                 contour_lines = []
                 # cnts is a list of lists of contours, one list per level
                 for cnt_level in cnts:
+                    if stop_event.is_set():
+                        raise InterruptedError("Hatched process stopped by user")
                     for cnt in cnt_level:
                         # Convert (row, col) to (x, y) and swap
                         contour_lines.append(np.ascontiguousarray(cnt[:, [1, 0]]).view(np.complex128).reshape(-1))
@@ -82,6 +85,8 @@ def run_hatched_thread(window: sg.Window, params: dict):
                 print("Hatch thread: Processing hatches...")
                 lines = []
                 if mls:
+                    if stop_event.is_set():
+                        raise InterruptedError("Hatched process stopped by user")
                     for line_string in mls.geoms:
                         # Convert coords to complex numbers
                         lines.append(np.ascontiguousarray(line_string.coords).view(np.complex128).reshape(-1))
@@ -94,6 +99,9 @@ def run_hatched_thread(window: sg.Window, params: dict):
         
         window.write_event_value("-THREAD_DONE-", (document, "Hatched vectorization complete.", params["cmyk"]))
 
+    except InterruptedError as e:
+        print(f"Hatch thread interrupted: {e}")
+        window.write_event_value("-THREAD_DONE-", (None, "Hatched vectorization stopped.", False))
     except Exception as e:
         print("An error occurred in the hatch thread:")
         traceback.print_exc()

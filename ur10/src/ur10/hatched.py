@@ -190,6 +190,7 @@ def _build_hatch(
     invert: bool = False,
     hatch_angle: Union[float, List[float]] = 45, # <-- MODIFIED
     offset: float = 0.0,
+    stop_event: "threading.Event" = None,
 ) -> Tuple[MultiLineString, Any, Any, Any]:
 
     if not isinstance(levels, tuple):
@@ -211,7 +212,11 @@ def _build_hatch(
     mls = [shapely.from_wkt("MULTILINESTRING EMPTY") for i in range(n_levels)]
 
     try:
-        mask = [_build_mask(i) for i in contours[::-1]]
+        mask = []
+        for i in contours[::-1]:
+            if stop_event and stop_event.is_set():
+                raise InterruptedError("Hatched process stopped by user")
+            mask.append(_build_mask(i))
 
         # Spacing considers interleaved lines from different levels
         delta_factors = [2 ** (n_levels - 1)]
@@ -220,16 +225,19 @@ def _build_hatch(
         offset_factors.extend([2 ** (n_levels - i - 1) for i in range(1, n_levels)])
 
         if circular:
-            lines = [
-                _build_circular_hatch(
-                    delta_factors[i] * hatch_pitch,
-                    offset_factors[i] * hatch_pitch + offset,
-                    w,
-                    h,
-                    center=center,
+            lines = []
+            for i in range(len(levels)):
+                if stop_event and stop_event.is_set():
+                    raise InterruptedError("Hatched process stopped by user")
+                lines.append(
+                    _build_circular_hatch(
+                        delta_factors[i] * hatch_pitch,
+                        offset_factors[i] * hatch_pitch + offset,
+                        w,
+                        h,
+                        center=center,
+                    )
                 )
-                for i in range(len(levels))
-            ]
         else:
             # --- MODIFICATION FOR MULTIPLE ANGLES ---
             if not isinstance(hatch_angle, (list, tuple)):
@@ -239,6 +247,9 @@ def _build_hatch(
             all_lines_by_level = [[] for _ in range(n_levels)]
 
             for angle in hatch_angle:
+                if stop_event and stop_event.is_set():
+                    raise InterruptedError("Hatched process stopped by user")
+                
                 # correct offset to ensure desired distance between hatches
                 current_hatch_pitch = hatch_pitch
                 sine_angle = math.sin((angle % 180) * math.pi / 180)
@@ -247,16 +258,19 @@ def _build_hatch(
                 if angle % 180 != 0 and sine_angle != 0:
                     current_hatch_pitch /= sine_angle
 
-                lines_for_this_angle = [
-                    _build_diagonal_hatch(
-                        delta_factors[i] * current_hatch_pitch,
-                        offset_factors[i] * current_hatch_pitch + offset,
-                        w,
-                        h,
-                        angle=angle,
+                lines_for_this_angle = []
+                for i in range(n_levels):
+                    if stop_event and stop_event.is_set():
+                        raise InterruptedError("Hatched process stopped by user")
+                    lines_for_this_angle.append(
+                        _build_diagonal_hatch(
+                            delta_factors[i] * current_hatch_pitch,
+                            offset_factors[i] * current_hatch_pitch + offset,
+                            w,
+                            h,
+                            angle=angle,
+                        )
                     )
-                    for i in range(n_levels)
-                ]
                 
                 # Add these generated lines to the correct level's list
                 for i in range(n_levels):
@@ -268,17 +282,25 @@ def _build_hatch(
 
         frame = Polygon([(3, 3), (w - 6, 3), (w - 6, h - 6), (3, h - 6)])
 
-        mls_ = [
-            MultiLineString(MultiLineString(lines[i]).difference(mask[i]).intersection(frame))
-            for i in range(n_levels)
-        ]
+        mls_ = []
+        for i in range(n_levels):
+            if stop_event and stop_event.is_set():
+                raise InterruptedError("Hatched process stopped by user")
+            mls_.append(
+                MultiLineString(MultiLineString(lines[i]).difference(mask[i]).intersection(frame))
+            )
 
-        mls = [
-            MultiLineString(shapely.ops.linemerge([i for i in mls_[j].geoms]))
-            for j in range(n_levels)
-        ]
+        mls = []
+        for j in range(n_levels):
+            if stop_event and stop_event.is_set():
+                raise InterruptedError("Hatched process stopped by user")
+            merged_geoms = [i for i in mls_[j].geoms]
+            mls.append(MultiLineString(shapely.ops.linemerge(merged_geoms)))
 
     except Exception as exc:
+        # Re-raise interrupted error to be caught by the calling thread
+        if isinstance(exc, InterruptedError):
+            raise exc
         print(f"Error: {exc}")
 
     all_lines = []
