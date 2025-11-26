@@ -10,7 +10,7 @@ import json
 import math
 
 from gui_layout import create_layout
-from gui_preview import update_preview, update_svg_preview
+from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
@@ -46,7 +46,10 @@ def main():
         print("Error reading home_config.json. File might be corrupted.")
 
     window["-GRAPH-"].hide_row()
-    document: Union[vpype.Document, None] = None
+    # document: Union[vpype.Document, None] = None
+    flow_document: Union[vpype.Document, None] = None
+    hatched_document: Union[vpype.Document, None] = None
+
     ur10_controller: Union[UR10Controller, None] = None
     svg_path_list = []
     scaled_dims = {"width": 0, "height": 0}
@@ -275,18 +278,28 @@ def main():
                         print(f"Thread Error: {message}")
                         sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
-                        document = doc_from_thread  # Store the new document
-                        active_tab = values["-TABGROUP-"]
-                        log_key = "-LOG_FLOW-" if active_tab == "-TAB_FLOW-" else "-LOG_HATCHED-"
+                        log_key = "-LOG_FLOW-" if "Flow Imager" in message else "-LOG_HATCHED-"
                         window[log_key].print(message)
-                        # Pass the checkbox value to the preview function
-                        update_preview(window, document, is_cmyk=is_cmyk)
+                        
+                        # Call the specific preview function and select the tab
+                        if "Flow Imager" in message:
+                            flow_document = doc_from_thread
+                            update_flow_preview(window, flow_document, is_cmyk)
+                            window["-TAB_FLOW_PREVIEW-"].select()
+                        elif "Hatched" in message:
+                            hatched_document = doc_from_thread
+                            update_hatched_preview(window, hatched_document, is_cmyk)
+                            window["-TAB_HATCHED_PREVIEW-"].select()
                     else:
-                        active_tab = values["-TABGROUP-"]
-                        log_key = "-LOG_FLOW-" if active_tab == "-TAB_FLOW-" else "-LOG_HATCHED-"
+                        log_key = "-LOG_FLOW-" if "Flow Imager" in message else "-LOG_HATCHED-"
                         window[log_key].print("Thread finished but document is empty.")
-                        document = None # Clear the old document
-                        update_preview(window, None, is_cmyk=False) # Show a blank screen
+                        if "Flow Imager" in message:
+                            flow_document = None
+                        elif "Hatched" in message:
+                            hatched_document = None
+                        # Also clear the previews
+                        update_flow_preview(window, None, is_cmyk=False)
+                        update_hatched_preview(window, None, is_cmyk=False)
                 
                 # --- Vectorizer Stop Events ---
                 elif event == "-BTN_STOP_FLOW-":
@@ -322,14 +335,19 @@ def main():
                 
                 # --- Optimize Event ---
                 elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-"):
-                    if document is None:
-                        print("No drawing to optimize. Generate or vectorize first.")
+                    
+                    is_flow = event == "-BTN_OPTIMIZE-"
+                    doc_to_optimize = flow_document if is_flow else hatched_document
+
+                    if doc_to_optimize is None:
+                        log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                        window[log_key].print("No drawing to optimize. Generate one first.")
                         continue
                     
-                    log_key = "-LOG_FLOW-" if event == "-BTN_OPTIMIZE-" else "-LOG_HATCHED-"
+                    log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
                     window[log_key].print("Optimizing drawing... please wait.")
                     
-                    if event == "-BTN_OPTIMIZE-":
+                    if is_flow:
                         merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
                         simplify_tol = values["-OPT_SIMPLIFY-"].strip().replace("mm", "").strip()
                     else:
@@ -340,27 +358,33 @@ def main():
                     
                     print(f"Running command: vpype {cmd_string}")
                     # This is fast, so no thread is needed
-                    document = execute(cmd_string, document=document)
+                    optimized_doc = execute(cmd_string, document=doc_to_optimize)
                     
-                    if document:
-                        window[log_key].print("Optimization complete. Updating preview.")
+                    if optimized_doc:
+                        if is_flow:
+                            flow_document = optimized_doc
+                        else:
+                            hatched_document = optimized_doc
+
+                        window[log_key].print("Optimization complete. Updating final preview.")
                         
-                        # Check which tab is active to get the right CMYK value
-                        active_tab_key = values["-TABGROUP-"]
-                        is_cmyk = False
-                        if active_tab_key == "-TAB_FLOW-":
-                            is_cmyk = values["-FLOW_CMYK-"]
-                        elif active_tab_key == "-TAB_HATCHED-":
-                            is_cmyk = values["-HATCHED_CMYK-"]
+                        is_cmyk = values["-FLOW_CMYK-"] if is_flow else values["-HATCHED_CMYK-"]
                             
-                        update_preview(window, document, is_cmyk=is_cmyk)
+                        # Update the "Final Preview" tab with the optimized drawing
+                        update_preview(window, optimized_doc, is_cmyk=is_cmyk)
+                        window["-TAB_FINAL_PREVIEW-"].select()
                     else:
                         window[log_key].print("Optimization failed.")
 
                 # --- Save Event ---
                 elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-"):
-                    if document is None:
-                        print("Error: No document to save. Generate or vectorize first.")
+                    
+                    is_flow = event == "-BTN_SAVE-"
+                    doc_to_save = flow_document if is_flow else hatched_document
+
+                    if doc_to_save is None:
+                        log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                        window[log_key].print("Error: No document to save. Generate or optimize first.")
                         continue
 
                     save_path = sg.popup_get_file(
@@ -371,13 +395,13 @@ def main():
                         file_types=(("SVG Files", "*.svg"),)
                     )
 
-                    log_key = "-LOG_FLOW-" if event == "-BTN_SAVE-" else "-LOG_HATCHED-"
+                    log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
 
                     if save_path:
                         try:
                             window[log_key].print(f"Saving SVG to {save_path}...")
                             with open(save_path, "w", encoding="utf-8") as f:
-                                vpype.write_svg(f, document)
+                                vpype.write_svg(f, doc_to_save)
                             window[log_key].print("SVG file saved successfully.")
                         except Exception as e:
                             print(f"Error saving file: {e}")

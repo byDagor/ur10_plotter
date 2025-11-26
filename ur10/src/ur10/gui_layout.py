@@ -223,6 +223,8 @@ def create_layout():
         [sg.Text("Preview", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
         [sg.TabGroup([
             [
+                sg.Tab("Flow Preview", [[sg.Image(key="-FLOW_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_FLOW_PREVIEW-"),
+                sg.Tab("Hatched Preview", [[sg.Image(key="-HATCHED_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_HATCHED_PREVIEW-"),
                 sg.Tab("Final Preview", [
                     [sg.Graph(
                         canvas_size=(600, 600),
