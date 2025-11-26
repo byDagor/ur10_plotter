@@ -2,6 +2,7 @@ import rtde_control
 import rtde_receive
 import threading
 import numpy as np
+import time
 
 SAFE_Z_OFFSET = 0.01
 
@@ -72,64 +73,102 @@ class UR10Controller:
         if not self.is_connected:
             print("Not connected to the robot.")
             return
-        
+
         self.stop_event.clear()
-        self.pause_event.clear()
-        
+        self.pause_event.clear()  # Ensure pause is not active at start
+
         print("Executing path...")
         self.go_home(home_pose, acceleration=acceleration)
-        safe_z = home_pose[2] + SAFE_Z_OFFSET  # Safe height for pen-up moves
+        safe_z = home_pose[2] + SAFE_Z_OFFSET
 
-        for path in paths:
-            if not path: continue
-            if self.stop_event.is_set(): break
+        path_idx = 0
+        while path_idx < len(paths):
+            if self.stop_event.is_set():
+                break
+            path = paths[path_idx]
+            if not path:
+                path_idx += 1
+                continue
 
-            start_pose = path[0]
             # Move to the start of the path with pen up
+            start_pose = path[0]
             if not dry_run:
                 start_pose_up = list(start_pose)
                 start_pose_up[2] = safe_z
                 self.move_to(start_pose_up, speed=speed_control[0], acceleration=acceleration)
 
-            # Move to the start point (pen down if not dry run)
+            # Move to the start point (pen down)
             self.move_to(start_pose, speed=speed_control[0], acceleration=acceleration)
-            
-            # Draw the path
-            for i in range(len(path) - 1):
-                if self.stop_event.is_set(): break
-                
-                # --- Pause Logic ---
-                if self.pause_event.is_set():
-                    print("Path execution paused.")
-                    paused_pose = self.get_current_pose()
-                    if not dry_run:
-                        pen_up_pose = paused_pose.copy()
-                        if pen_up_pose[2] < safe_z: # only lift if it's drawing
-                            pen_up_pose[2] = safe_z
-                            self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
-                    
-                    self.pause_event.wait() # Wait for resume
-                    print("Resuming path execution.")
-                    
-                    if not dry_run and paused_pose[2] < safe_z:
-                        self.move_to(paused_pose, speed=0.5, acceleration=acceleration)
-                
-                next_pose = path[i+1]
+
+            point_idx = 0
+            while point_idx < len(path) - 1:
+                if self.stop_event.is_set():
+                    break
+
+                # Draw the line segment
+                current_pose = path[point_idx]
+                next_pose = path[point_idx + 1]
                 self.move_to(next_pose, speed=speed_control[0], acceleration=acceleration)
-                window.write_event_value("-DRAW_LINE-", (path[i], next_pose))
+                window.write_event_value("-DRAW_LINE-", (current_pose, next_pose))
 
-            if self.stop_event.is_set(): break
+                point_idx += 1
 
-            # Lift the pen at the end of the path
-            end_pose = path[-1]
-            if not dry_run:
+                # --- Pause Logic (checks after a line is completed) ---
+                if self.pause_event.is_set():
+                    print("Pause command received. Finishing line and pausing.")
+                    
+                    # 1. Get current position and lift pen
+                    paused_pose_at_line_end = self.get_current_pose()
+                    if not dry_run and paused_pose_at_line_end:
+                        pen_up_pose = list(paused_pose_at_line_end)
+                        pen_up_pose[2] = safe_z
+                        self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
+
+                    # 2. Go to home position
+                    self.go_home(home_pose, speed=0.5, acceleration=acceleration)
+
+                    # 3. Wait for the resume command (pause_event to be cleared)
+                    while self.pause_event.is_set():
+                        if self.stop_event.is_set():
+                            break
+                        time.sleep(0.1)  # Poll to reduce CPU usage
+
+                    # 4. Resume Logic
+                    if self.stop_event.is_set():
+                        continue # Exit the inner loop to be handled by the outer loop's stop check
+
+                    print("Resume command received. Returning to drawing position.")
+                    
+                    # Move back to the paused position
+                    if paused_pose_at_line_end:
+                        # Move to a safe Z height above the resume point
+                        safe_resume_pose = list(paused_pose_at_line_end)
+                        safe_resume_pose[2] = safe_z
+                        self.move_to(safe_resume_pose, speed=0.5, acceleration=acceleration)
+                        
+                        # Move down to the drawing surface if not a dry run
+                        if not dry_run:
+                            self.move_to(paused_pose_at_line_end, speed=0.5, acceleration=acceleration)
+
+            if self.stop_event.is_set():
+                break
+
+            # Lift the pen at the end of the path segment
+            if not dry_run and path:
+                end_pose = path[-1]
                 end_pose_up = list(end_pose)
                 end_pose_up[2] = safe_z
                 self.move_to(end_pose_up, speed=speed_control[0], acceleration=acceleration)
+            
+            path_idx += 1
 
+        # Final actions
         self.go_home(home_pose, acceleration=acceleration)
-        window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
-        print("Path execution complete.")
+        if not self.stop_event.is_set():
+            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
+            print("Path execution complete.")
+        else:
+            print("Path execution stopped by user.")
 
     def go_home(self, home_pose, speed=0.5, acceleration=1.2):
         """
