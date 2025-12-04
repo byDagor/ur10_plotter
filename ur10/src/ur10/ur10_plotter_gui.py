@@ -259,37 +259,27 @@ def main():
                     # --- PARSE ALL PARAMETERS ---
                     params = {}
                     params["img_path"] = img_path
+                    params["method"] = values["-DITHER_METHOD-"]
+                    
                     try:
+                        # Physical and artistic controls
                         params["pen_diameter_mm"] = float(values["-DITHER_PEN_DIAMETER-"].strip())
                         params["canvas_width_mm"] = float(values["-DITHER_CANVAS_WIDTH-"].strip())
                         params["canvas_height_mm"] = float(values["-DITHER_CANVAS_HEIGHT-"].strip())
-                        params["detail_multiplier"] = values["-DITHER_DETAIL_MULTIPLIER-"]
+                        params["h_dots"] = int(values["-DITHER_H_DOTS-"])
                         params["density"] = values["-DITHER_DENSITY-"]
-                    except ValueError:
-                        print("Error: Invalid input for Pen Diameter, Canvas Width, or Canvas Height. Please enter numbers.")
+                        
+                        if values["-DITHER_METHOD-"] == "Floyd-Steinberg":
+                            params["threshold"] = int(values["-DITHER_THRESHOLD-"])
+                        else:
+                            params["threshold"] = 127 # Default value for other methods
+                        
+                        # Calculate dot radius for the output SVG from physical pen size
+                        params["dot_radius_mm"] = params["pen_diameter_mm"] / 2.0
+
+                    except (ValueError, ZeroDivisionError) as e:
+                        print(f"Error: Invalid numeric input. Please check your values. ({e})")
                         continue
-                    
-                    # Calculate effective resolution and dot radius
-                    pen_diameter_mm = params["pen_diameter_mm"]
-                    canvas_width_mm = params["canvas_width_mm"]
-                    # canvas_height_mm = params["canvas_height_mm"] # Not directly used in h_dots calc, but in dither_task
-                    detail_multiplier = params["detail_multiplier"]
-
-                    # Determine optimal h_dots based on canvas width and pen diameter
-                    # Each 'pixel' in the dithered image corresponds to a potential dot location.
-                    # We want to fit canvas_width_mm / pen_diameter_mm dots across the width,
-                    # and then scale that by the detail_multiplier.
-                    base_h_dots = canvas_width_mm / pen_diameter_mm
-                    h_dots = round(base_h_dots * detail_multiplier)
-
-                    # Ensure h_dots is not too small for reasonable output
-                    h_dots = max(100, h_dots) 
-                    
-                    # The dot radius in the output vpype document is half the physical pen diameter
-                    dot_radius_mm = pen_diameter_mm / 2.0
-                    
-                    params["h_dots"] = h_dots
-                    params["dot_radius_mm"] = dot_radius_mm
                     # --- END PARSING ---
                     
                     # --- THREADING LOGIC ---
@@ -304,6 +294,15 @@ def main():
                         daemon=True
                     ).start()
 
+                # --- Dither Method Change Event ---
+                elif event == "-DITHER_METHOD-":
+                    if values[event] == "Floyd-Steinberg":
+                        window['-COL_THRESHOLD-'].update(visible=True)
+                        window['-COL_DENSITY-'].update(visible=False)
+                    else:
+                        window['-COL_THRESHOLD-'].update(visible=False)
+                        window['-COL_DENSITY-'].update(visible=True)
+                
                 # --- Event for when the thread is done ---
                 elif event == "-THREAD_DONE-":
                     # 1. Get results from the event

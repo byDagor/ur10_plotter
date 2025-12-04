@@ -11,35 +11,96 @@ import os
 import multiprocessing
 import tempfile
 
-
-# This class acts as a shim for dither.py's `Plot` object.
-class DitherPlotter:
-    def __init__(self):
-        self.plot_size = 6  # dither.py sets this to 6
+class DitherVectorizer:
+    def __init__(self, image_path: str, dither_method: str, luminance_threshold: int = 127, density: float = 1.0, h_dots: int = 150, dot_radius_mm: float = 0.175):
+        self.image_path = image_path
+        self.dither_method = dither_method
+        self.luminance_threshold = luminance_threshold
+        self.density = density
+        self.h_dots = h_dots
+        self.dot_radius_mm = dot_radius_mm
         self.points = []
 
-    def setup(self):
-        """Clears any previous points."""
-        self.points = []
+    def run(self):
+        # --- Image Preparation ---
+        img = Image.open(self.image_path).convert("L") # Convert to grayscale
+        original_width, original_height = img.size
+        
+        aspect_ratio = original_height / original_width
+        new_width = self.h_dots
+        new_height = round(new_width * aspect_ratio)
+        img = img.resize((new_width, new_height))
 
-    def dot(self, x, y):
-        """Stores a point to be plotted."""
-        self.points.append((x, y))
+        # --- Dithering ---
+        if self.dither_method == "Floyd-Steinberg":
+            self.fs_dither(img, new_width, new_height)
+        elif self.dither_method == "Ordered (Halftone)":
+            self.ordered_dither(img, new_width, new_height)
+        elif self.dither_method == "Stochastic (Random)":
+            self.random_dither(img, new_width, new_height)
+        
+        # --- SVG Generation ---
+        return self.get_document()
 
-    def get_document(self, dot_radius_mm=0.0001, num_segments=8):
-        """
-        Converts the stored points into a vpype.Document.
-        Each dot is represented as a small circle (polygon).
-        """
+    def fs_dither(self, img, new_width, new_height):
+        pixels = np.array(img, dtype=np.float32)
+        norm_dim = max(new_width, new_height)
+
+        for r in range(new_height - 1):
+            for c in range(1, new_width - 1):
+                oldpixel = pixels[r, c]
+                newpixel = 255.0 if oldpixel > self.luminance_threshold else 0.0
+                pixels[r, c] = newpixel
+                
+                if newpixel == 0.0:
+                    x = (c / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    y = (r / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    self.points.append((x, y))
+                
+                quant_error = oldpixel - newpixel
+                pixels[r, c + 1] += quant_error * 7 / 16
+                pixels[r + 1, c - 1] += quant_error * 3 / 16
+                pixels[r + 1, c] += quant_error * 5 / 16
+                pixels[r + 1, c + 1] += quant_error * 1 / 16
+
+    def ordered_dither(self, img, new_width, new_height):
+        pixels = np.array(img, dtype=np.float32)
+        norm_dim = max(new_width, new_height)
+        bayer_matrix = np.array([
+            [0, 128, 32, 160],
+            [192, 64, 224, 96],
+            [48, 176, 16, 144],
+            [240, 112, 208, 80]
+        ])
+        for r in range(new_height):
+            for c in range(new_width):
+                bayer_threshold = bayer_matrix[r % 4, c % 4]
+                adjusted_brightness = pixels[r, c] / (self.density + 0.001)
+                if adjusted_brightness < bayer_threshold:
+                    x = (c / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    y = (r / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    self.points.append((x,y))
+
+    def random_dither(self, img, new_width, new_height):
+        pixels = list(img.getdata())
+        norm_dim = max(new_width, new_height)
+        for i, brightness in enumerate(pixels):
+            darkness = 255 - brightness
+            if (darkness * self.density) > random.randint(0, 255):
+                c = i % new_width
+                r = i // new_width
+                x = (c / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                y = (r / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                self.points.append((x,y))
+
+    def get_document(self, num_segments=8):
         if not self.points:
             return vp.Document()
 
         all_circle_lines = []
         for x, y in self.points:
-            # Manually create the points for a circle polygon
             angles = np.linspace(0, 2 * np.pi, num_segments, endpoint=False)
-            circle_points = [complex(x + dot_radius_mm * np.cos(a), y + dot_radius_mm * np.sin(a)) for a in angles]
-            # Close the circle
+            circle_points = [complex(x + self.dot_radius_mm * np.cos(a), y + self.dot_radius_mm * np.sin(a)) for a in angles]
             circle_points.append(circle_points[0])
             all_circle_lines.append(np.array(circle_points))
 
@@ -48,71 +109,23 @@ class DitherPlotter:
         doc.add(lc)
         return doc
 
-# Now the run_dither_thread function
 def _dither_task(params: dict, result_queue: multiprocessing.Queue):
     """
     The actual dithering task that runs in a separate process.
-    This version uses an ordered dithering algorithm with a Bayer matrix.
     """
     try:
-        img_path = params["img_path"]
-        pen_diameter_mm = params["pen_diameter_mm"]
-        canvas_width_mm = params["canvas_width_mm"]
-        canvas_height_mm = params["canvas_height_mm"]
-        detail_multiplier = params["detail_multiplier"]
-        density = params.get("density", 1.0)
-
-        dither_plotter = DitherPlotter()
-        dither_plotter.setup() 
-
-        img = Image.open(img_path).convert("L") # Convert to grayscale/luminance
-        original_width, original_height = img.size
-        
-        # Calculate h_dots based on canvas width, pen diameter, and detail multiplier
-        base_h_dots = canvas_width_mm / pen_diameter_mm
-        h_dots = round(base_h_dots * detail_multiplier)
-        h_dots = max(100, h_dots) # Ensure a minimum for reasonable output
-
-        # Calculate new image dimensions to process, preserving aspect ratio
-        aspect_ratio = original_height / original_width
-        new_width = h_dots
-        new_height = round(new_width * aspect_ratio)
-        img = img.resize((new_width, new_height))
-
-        # The dot radius for drawing is half the physical pen diameter
-        dot_radius_mm = pen_diameter_mm / 2.0
-
-        norm_dim = max(new_width, new_height)
-        pixels = list(img.getdata())
-        
-        # 4x4 Bayer matrix, normalized to 0-255 range
-        bayer_matrix = np.array([
-            [  0, 128,  32, 160],
-            [192,  64, 224,  96],
-            [ 48, 176,  16, 144],
-            [240, 112, 208,  80]
-        ])
-        
-        for i, brightness in enumerate(pixels):
-            c = i % new_width
-            r = i // new_width
-            
-            # Get threshold from repeating Bayer matrix
-            threshold = bayer_matrix[r % 4, c % 4]
-            
-            # Adjust brightness with the density slider and compare to threshold
-            adjusted_brightness = brightness / (density + 0.001)
-
-            if adjusted_brightness < threshold:
-                # This is a dot
-                x = (c/norm_dim) * 100 + random.uniform(-0.05, 0.05)
-                y = (r/norm_dim) * 100 + random.uniform(-0.05, 0.05)
-                dither_plotter.dot(x, y)
-        
-        document = dither_plotter.get_document(dot_radius_mm=dot_radius_mm)
+        vectorizer = DitherVectorizer(
+            image_path=params["img_path"],
+            dither_method=params.get("method", "Floyd-Steinberg"),
+            luminance_threshold=params.get("threshold", 127),
+            density=params.get("density", 1.0),
+            h_dots=params.get("h_dots", 150),
+            dot_radius_mm=params.get("dot_radius_mm", 0.175)
+        )
+        document = vectorizer.run()
 
         if document and not document.is_empty():
-            # Save the document to a temporary file
+            # Use a temporary file to pass the document back
             fd, temp_path = tempfile.mkstemp(suffix=".svg")
             os.close(fd)
             with open(temp_path, "w", encoding="utf-8") as f:
@@ -122,8 +135,8 @@ def _dither_task(params: dict, result_queue: multiprocessing.Queue):
             result_queue.put((False, "Dithering resulted in an empty document."))
 
     except Exception as e:
+        traceback.print_exc()
         result_queue.put((False, str(e)))
-
 
 def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Event"):
     """
@@ -142,25 +155,27 @@ def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Ev
         
         process.start()
 
-        # Poll for completion or stop signal
         while process.is_alive():
             if stop_event.is_set():
                 print("Stop event received, terminating process.")
                 process.terminate()
-                process.join(timeout=1) # Attempt to gracefully join
+                process.join(timeout=1) # Give it a second to close
                 if process.is_alive():
-                    print("Process did not terminate, killing.")
-                    process.kill() # Force kill if terminate fails
-                    process.join() # Wait for the kill
+                    print("Process did not terminate gracefully, killing.")
+                    process.kill()
+                    process.join()
                 return 
             
             time.sleep(0.1)
 
-        # Process finished without being stopped
         end_time = time.time()
         window.write_event_value("-LOG_MESSAGE-", f"Dither process complete in {end_time - start_time:.2f} seconds.")
 
-        # Get the result from the queue
+        # Check if the queue is empty, might happen if process is killed
+        if result_queue.empty():
+            print("Result queue is empty after process finished.")
+            return
+
         success, result_path_or_msg = result_queue.get()
 
         if success:
@@ -188,4 +203,3 @@ def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Ev
     finally:
         result_queue.close()
         result_queue.join_thread()
-

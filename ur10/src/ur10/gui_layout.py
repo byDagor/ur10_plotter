@@ -99,15 +99,30 @@ def create_layout():
 
     # --- Tab for Dither ---
     dither_controls = [
-        [sg.Text("Vectorize an image using Dithering (Floyd-Steinberg).", font="Helvetica 12")],
+        [sg.Text("Vectorize an image using dithering.", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
         
+        # Add the physical dimension controls back
         [sg.Text("Pen Diameter (mm):", s=(15, 1)), sg.Input("0.35", key="-DITHER_PEN_DIAMETER-", s=(10, 1))],
-        [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("100", key="-DITHER_CANVAS_WIDTH-", s=(10, 1))],
-        [sg.Text("Canvas Height (mm):", s=(15, 1)), sg.Input("100", key="-DITHER_CANVAS_HEIGHT-", s=(10, 1))],
-        [sg.Text("Detail Multiplier:", s=(15, 1)), sg.Slider(range=(0.5, 2.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_DETAIL_MULTIPLIER-", s=(30, 20))],
-        [sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 2.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))],
+        [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-DITHER_CANVAS_WIDTH-", s=(10, 1))],
+        [sg.Text("Canvas Height (mm):", s=(15, 1)), sg.Input("210", key="-DITHER_CANVAS_HEIGHT-", s=(10, 1))],
+
+        [sg.Text("Detail (Horizontal Dots):", s=(15, 1)), sg.Slider(range=(50, 500), default_value=150, resolution=1, orientation="h", key="-DITHER_H_DOTS-", s=(30, 20))],
+        
+        [sg.Text("Dithering Method:", s=(15,1)), sg.DropDown(["Floyd-Steinberg", "Ordered (Halftone)", "Stochastic (Random)"], default_value="Floyd-Steinberg", key="-DITHER_METHOD-", s=(30,1), enable_events=True)],
+        
+        # Column for Threshold slider (for Floyd-Steinberg)
+        [sg.Column([[
+            sg.Text("Luminance Threshold:", s=(15, 1)), 
+            sg.Slider(range=(0, 255), default_value=127, resolution=1, orientation="h", key="-DITHER_THRESHOLD-", s=(30, 20))
+        ]], key='-COL_THRESHOLD-')],
+
+        # Column for Density slider (for Ordered and Stochastic)
+        [sg.Column([[
+            sg.Text("Density:", s=(15, 1)), 
+            sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))
+        ]], key='-COL_DENSITY-', visible=False)],
         
         [
             sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"),
@@ -164,11 +179,14 @@ def create_layout():
         [sg.Text("Draw Hatch Fill:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the shading lines inside the contours.", size=(DESC_W, None))],
 
         [sg.Text("Dither Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
-        [sg.Text("Pen Diameter (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical diameter of the pen/marker tip being used. (mm)", size=(DESC_W, None))],
-        [sg.Text("Canvas Width (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical width of the canvas you are plotting on. (mm)", size=(DESC_W, None))],
-        [sg.Text("Canvas Height (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical height of the canvas you are plotting on. (mm)", size=(DESC_W, None))],
-        [sg.Text("Detail Multiplier:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Adjusts the effective dot resolution. A higher value samples the image more finely. (Multiplier)", size=(DESC_W, None))],
-        [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls the overall darkness of the image by adjusting brightness before dithering is applied.", size=(DESC_W, None))],
+        [sg.Text("Dot Radius (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The radius of each dot in the final drawing. Should be half your physical pen's diameter.", size=(DESC_W, None))],
+        [sg.Text("Detail (Horizontal Dots):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The number of possible dot positions horizontally. This controls the output resolution.", size=(DESC_W, None))],
+        [sg.Text("Dithering Method:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The algorithm used to generate the dot pattern.", size=(DESC_W, None))],
+        [sg.Text("  - Floyd-Steinberg:", font="Helvetica 10", size=(LBL_W,1)), sg.Text("High-quality, organic-looking error diffusion.", size=(DESC_W, None))],
+        [sg.Text("  - Ordered (Halftone):", font="Helvetica 10", size=(LBL_W,1)), sg.Text("Clean, structured, grid-like patterns.", size=(DESC_W, None))],
+        [sg.Text("  - Stochastic (Random):", font="Helvetica 10", size=(LBL_W,1)), sg.Text("Noisy, organic, but potentially messy pattern.", size=(DESC_W, None))],
+        [sg.Text("Luminance Threshold:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Floyd-Steinberg. The brightness cutoff between black and white. (0-255)", size=(DESC_W, None))],
+        [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Ordered and Stochastic methods. Adjusts the overall darkness. (Multiplier)", size=(DESC_W, None))],
 
         [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
