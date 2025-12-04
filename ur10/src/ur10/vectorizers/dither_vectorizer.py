@@ -143,6 +143,16 @@ def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Ev
     This function runs in a thread and manages a separate process for the
     actual dithering work. This allows the work to be terminated and avoids GIL issues.
     """
+    # Log the parameters being used
+    param_str = (
+        f"Method: {params.get('method')}, "
+        f"H-Dots: {params.get('h_dots')}, "
+        f"Pen Diameter: {params.get('pen_diameter_mm')}mm, "
+        f"Threshold: {params.get('threshold')}, "
+        f"Density: {params.get('density')}"
+    )
+    window.write_event_value("-LOG_MESSAGE-", f"Dithering with params: {param_str}")
+
     result_queue = multiprocessing.Queue()
     process = multiprocessing.Process(
         target=_dither_task,
