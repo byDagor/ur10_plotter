@@ -104,7 +104,7 @@ def create_layout():
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
         
         [sg.Text("Dot Radius (mm):", s=(15, 1)), sg.Input("0.1", key="-DITHER_DOT_RADIUS-", s=(10, 1))],
-        [sg.Text("Image Scale:", s=(15, 1)), sg.Slider(range=(0.1, 10.0), default_value=0.5, resolution=0.05, orientation="h", key="-DITHER_IMAGE_SCALE-", s=(30, 20))],
+        [sg.Text("Image Scale:", s=(15, 1)), sg.Slider(range=(0.01, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-DITHER_IMAGE_SCALE-", s=(30, 20))],
         [sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.01, 2.0), default_value=1.0, resolution=0.01, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))],
         
         [
