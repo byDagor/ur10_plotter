@@ -4,6 +4,7 @@ import hatched
 import numpy as np
 import time
 import traceback
+import threading
 
 def run_hatched_thread(window: sg.Window, params: dict, stop_event: "threading.Event"):
     """

@@ -17,7 +17,13 @@ This application is intended for generating plotter-friendly SVG files from imag
 
 ### `ur10_plotter_gui_v1.0.0.py`
 
-This is the main application for the UR10 plotter project and is currently under development. It will eventually include features for controlling the UR10 robot arm, sending it SVG files to draw, and more. It is based on the same GUI framework as `vpype_gui_v1.2.py`.
+This is the main application for the UR10 plotter project and is currently under development. It includes features for controlling the UR10 robot arm and sending it SVG files to draw. It also provides several methods for image vectorization:
+
+*   **Flow Imager:** Uses `vpype`'s `flow_imager` plugin to create vector fields that follow the dark areas of an image, creating a "flow" effect.
+*   **Hatched:** Uses the included `hatched.py` library to create hatched patterns from images, representing shading with lines.
+*   **Dither:** Applies a Floyd-Steinberg dithering algorithm to convert an image into a series of dots, suitable for dot plotting.
+
+It is based on the same GUI framework as `vpype_gui_v1.2.py`.
 
 ## Core Libraries
 

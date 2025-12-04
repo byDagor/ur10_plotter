@@ -6,6 +6,7 @@ import traceback
 import multiprocessing
 import tempfile
 import os
+import threading
 
 def _vectorize_task(cmd_string: str, result_queue: multiprocessing.Queue):
     """

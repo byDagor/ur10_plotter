@@ -97,6 +97,33 @@ def create_layout():
     # Make the Hatched tab scrollable
     hatched_controls_col = [[sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
 
+    # --- Tab for Dither ---
+    dither_controls = [
+        [sg.Text("Vectorize an image using Dithering (Floyd-Steinberg).", font="Helvetica 12")],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
+        
+        [sg.Text("Dot Radius (mm):", s=(15, 1)), sg.Input("0.1", key="-DITHER_DOT_RADIUS-", s=(10, 1))],
+        [sg.Text("Image Scale:", s=(15, 1)), sg.Slider(range=(0.1, 10.0), default_value=0.5, resolution=0.05, orientation="h", key="-DITHER_IMAGE_SCALE-", s=(30, 20))],
+        [sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.01, 2.0), default_value=1.0, resolution=0.01, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))],
+        
+        [
+            sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"),
+            sg.Button("Stop", key="-BTN_STOP_DITHER-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
+        ],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Text("Optimization", font="Helvetica 12")],
+        [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-DITHER-", s=(10, 1))],
+        [sg.Text("Simplify Tol. (mm):", s=(15, 1)), sg.Input("0.05", key="-OPT_SIMPLIFY-DITHER-", s=(10, 1))],
+        [sg.Button("Optimize Drawing", key="-BTN_OPTIMIZE-DITHER-", expand_x=True)],
+        [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
+        [sg.Button("Save SVG", key="-BTN_SAVE-DITHER-", expand_x=True, button_color=("white", "green"))],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Status:")],
+        [sg.Multiline(key="-LOG_DITHER-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
+    ]
+    dither_controls_col = [[sg.Column(dither_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
+
     
     # --- Tab 3: Instructions (with text wrapping and units) ---
     LBL_W = 20 # Width of the label column
@@ -133,6 +160,11 @@ def create_layout():
         [sg.Text("H-Mirror:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Flips the image horizontally.", size=(DESC_W, None))],
         [sg.Text("Draw Contours:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the outlines of the shadow shapes.", size=(DESC_W, None))],
         [sg.Text("Draw Hatch Fill:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the shading lines inside the contours.", size=(DESC_W, None))],
+
+        [sg.Text("Dither Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
+        [sg.Text("Dot Radius (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The radius of each dot in the final drawing. (mm)", size=(DESC_W, None))],
+        [sg.Text("Image Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Downscales image before processing. 0.5 = 50%. Improves performance. (Ratio)", size=(DESC_W, None))],
+        [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls the probability of dots appearing in dark areas. Higher values create a denser, darker image. (Multiplier)", size=(DESC_W, None))],
 
         [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
@@ -213,6 +245,7 @@ def create_layout():
             [
                 sg.Tab("Flow Imager", flow_controls_col, key="-TAB_FLOW-"),
                 sg.Tab("Hatched", hatched_controls_col, key="-TAB_HATCHED-"),
+                sg.Tab("Dither", dither_controls_col, key="-TAB_DITHER-"), # New Dither Tab
                 sg.Tab("UR10 Control", ur10_controls_col, key="-TAB_UR10-"),
                 sg.Tab("Instructions", instructions_tab, key="-TAB_INSTRUCTIONS-")
             ]
@@ -225,6 +258,7 @@ def create_layout():
             [
                 sg.Tab("Flow Preview", [[sg.Image(key="-FLOW_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_FLOW_PREVIEW-"),
                 sg.Tab("Hatched Preview", [[sg.Image(key="-HATCHED_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_HATCHED_PREVIEW-"),
+                sg.Tab("Dither Preview", [[sg.Image(key="-DITHER_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_DITHER_PREVIEW-"), # New Dither Preview Tab
                 sg.Tab("Final Preview", [
                     [sg.Graph(
                         canvas_size=(600, 600),

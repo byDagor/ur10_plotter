@@ -10,9 +10,10 @@ import json
 import math
 
 from gui_layout import create_layout
-from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview
+from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview, update_dither_preview
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
+from vectorizers.dither_vectorizer import run_dither_thread
 from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
 from robot.svg_parser import parse_svg
 
@@ -27,6 +28,7 @@ def main():
     
     stop_flow_event = threading.Event()
     stop_hatched_event = threading.Event()
+    stop_dither_event = threading.Event()
     
     # Load home position from config file
     home_pose = None
@@ -49,6 +51,7 @@ def main():
     # document: Union[vpype.Document, None] = None
     flow_document: Union[vpype.Document, None] = None
     hatched_document: Union[vpype.Document, None] = None
+    dither_document: Union[vpype.Document, None] = None
 
     ur10_controller: Union[UR10Controller, None] = None
     svg_path_list = []
@@ -69,6 +72,8 @@ def main():
                     window["-LOG_FLOW-"].print(values[event])
                 elif active_tab == "-TAB_HATCHED-":
                     window["-LOG_HATCHED-"].print(values[event])
+                elif active_tab == "-TAB_DITHER-":
+                    window["-LOG_DITHER-"].print(values[event])
                 else:
                     # Fallback for any other case
                     print(f"Log message from unhandled tab '{active_tab}': {values[event]}")
@@ -221,7 +226,7 @@ def main():
 
                     # Parse levels
                     try:
-                        levels = [int(l) for l in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(l) < 255]
+                        levels = [int(level_str) for level_str in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(level_str) < 255]
                         if not levels:
                             levels = (64, 128, 192) # Default if empty
                         params["levels"] = tuple(levels)
@@ -239,6 +244,39 @@ def main():
                     threading.Thread(
                         target=run_hatched_thread, # Call the thread function
                         args=(window, params, stop_hatched_event),      # Pass the parsed params dict and stop event
+                        daemon=True
+                    ).start()
+
+                # --- Dither Vectorize Event ---
+                elif event == "-BTN_VECTORIZE_DITHER-":
+                    print("Vectorizing image with Dither...")
+                    
+                    img_path = values["-IMG_PATH_DITHER-"]
+                    if not img_path or not os.path.exists(img_path):
+                        print(f"Error: Image file not found or not specified: {img_path}")
+                        continue
+                    
+                    # --- PARSE ALL PARAMETERS ---
+                    params = {}
+                    params["img_path"] = img_path
+                    params["image_scale"] = values["-DITHER_IMAGE_SCALE-"]
+                    params["density"] = values["-DITHER_DENSITY-"]
+                    try:
+                        params["dot_radius_mm"] = float(values["-DITHER_DOT_RADIUS-"].strip())
+                    except ValueError:
+                        print(f"Invalid Dot Radius: {values['-DITHER_DOT_RADIUS-']}. Using 0.1.")
+                        params["dot_radius_mm"] = 0.1
+                    # --- END PARSING ---
+                    
+                    # --- THREADING LOGIC ---
+                    window["-LOG_DITHER-"].print("Starting Dither vectorization... please wait.")
+                    stop_dither_event.clear()
+                    window["-BTN_VECTORIZE_DITHER-"].update(disabled=True)
+                    window["-BTN_STOP_DITHER-"].update(disabled=False)
+                    
+                    threading.Thread(
+                        target=run_dither_thread, # Call the thread function
+                        args=(window, params, stop_dither_event),      # Pass the parsed params dict and stop event
                         daemon=True
                     ).start()
 
@@ -264,6 +302,9 @@ def main():
                     if "Hatched" in message and stop_hatched_event.is_set():
                         # This was a stale event from a stopped thread, ignore it
                         continue
+                    if "Dither" in message and stop_dither_event.is_set(): # NEW
+                        # This was a stale event from a stopped thread, ignore it
+                        continue
 
                     # 2. Re-enable buttons and hide loading text
                     if "Flow Imager" in message:
@@ -272,13 +313,23 @@ def main():
                     elif "Hatched" in message:
                         window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
                         window["-BTN_STOP_HATCHED-"].update(disabled=True)
+                    elif "Dither" in message:
+                        window["-BTN_VECTORIZE_DITHER-"].update(disabled=False)
+                        window["-BTN_STOP_DITHER-"].update(disabled=True)
                     
                     # 3. Handle results
-                    if message not in ("Flow Imager vectorization complete.", "Hatched vectorization complete."):
+                    if message not in ("Flow Imager vectorization complete.", "Hatched vectorization complete.", "Dither vectorization complete."):
                         print(f"Thread Error: {message}")
                         sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
-                        log_key = "-LOG_FLOW-" if "Flow Imager" in message else "-LOG_HATCHED-"
+                        if "Flow Imager" in message:
+                            log_key = "-LOG_FLOW-"
+                        elif "Hatched" in message:
+                            log_key = "-LOG_HATCHED-"
+                        elif "Dither" in message:
+                            log_key = "-LOG_DITHER-"
+                        else:
+                            log_key = "-LOG_FLOW-" # Fallback
                         window[log_key].print(message)
                         
                         # Call the specific preview function and select the tab
@@ -290,16 +341,30 @@ def main():
                             hatched_document = doc_from_thread
                             update_hatched_preview(window, hatched_document, is_cmyk)
                             window["-TAB_HATCHED_PREVIEW-"].select()
+                        elif "Dither" in message:
+                            dither_document = doc_from_thread
+                            update_dither_preview(window, dither_document, is_cmyk)
+                            window["-TAB_DITHER_PREVIEW-"].select()
                     else:
-                        log_key = "-LOG_FLOW-" if "Flow Imager" in message else "-LOG_HATCHED-"
+                        if "Flow Imager" in message:
+                            log_key = "-LOG_FLOW-"
+                        elif "Hatched" in message:
+                            log_key = "-LOG_HATCHED-"
+                        elif "Dither" in message:
+                            log_key = "-LOG_DITHER-"
+                        else:
+                            log_key = "-LOG_FLOW-" # Fallback
                         window[log_key].print("Thread finished but document is empty.")
                         if "Flow Imager" in message:
                             flow_document = None
                         elif "Hatched" in message:
                             hatched_document = None
+                        elif "Dither" in message:
+                            dither_document = None
                         # Also clear the previews
                         update_flow_preview(window, None, is_cmyk=False)
                         update_hatched_preview(window, None, is_cmyk=False)
+                        update_dither_preview(window, None, is_cmyk=False)
                 
                 # --- Vectorizer Stop Events ---
                 elif event == "-BTN_STOP_FLOW-":
@@ -313,6 +378,12 @@ def main():
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=False)
                     window["-BTN_STOP_HATCHED-"].update(disabled=True)
                     window["-LOG_HATCHED-"].print("Hatched vectorization stopped by user.")
+
+                elif event == "-BTN_STOP_DITHER-":
+                    stop_dither_event.set()
+                    window["-BTN_VECTORIZE_DITHER-"].update(disabled=False)
+                    window["-BTN_STOP_DITHER-"].update(disabled=True)
+                    window["-LOG_DITHER-"].print("Dither vectorization stopped by user.")
 
                 # --- SVG Preview Event ---
                 elif event == "-SVG_PATH-":
@@ -334,26 +405,56 @@ def main():
                         update_svg_preview(window, None)
                 
                 # --- Optimize Event ---
-                elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-"):
+                elif event in ("-BTN_OPTIMIZE-", "-BTN_OPTIMIZE-HATCHED-", "-BTN_OPTIMIZE-DITHER-"):
                     
                     is_flow = event == "-BTN_OPTIMIZE-"
-                    doc_to_optimize = flow_document if is_flow else hatched_document
+                    is_hatched = event == "-BTN_OPTIMIZE-HATCHED-"
+                    is_dither = event == "-BTN_OPTIMIZE-DITHER-"
+
+                    if is_flow:
+                        doc_to_optimize = flow_document
+                    elif is_hatched:
+                        doc_to_optimize = hatched_document
+                    elif is_dither:
+                        doc_to_optimize = dither_document
+                    else:
+                        doc_to_optimize = None # Should not happen
 
                     if doc_to_optimize is None:
-                        log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                        if is_flow:
+                            log_key = "-LOG_FLOW-"
+                        elif is_hatched:
+                            log_key = "-LOG_HATCHED-"
+                        elif is_dither:
+                            log_key = "-LOG_DITHER-"
+                        else:
+                            log_key = "-LOG_FLOW-" # Default
                         window[log_key].print("No drawing to optimize. Generate one first.")
                         continue
                     
-                    log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                    if is_flow:
+                        log_key = "-LOG_FLOW-"
+                    elif is_hatched:
+                        log_key = "-LOG_HATCHED-"
+                    elif is_dither:
+                        log_key = "-LOG_DITHER-"
+                    else:
+                        log_key = "-LOG_FLOW-" # Default
                     window[log_key].print("Optimizing drawing... please wait.")
                     
                     if is_flow:
                         merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
                         simplify_tol = values["-OPT_SIMPLIFY-"].strip().replace("mm", "").strip()
-                    else:
+                    elif is_hatched:
                         merge_tol = values["-OPT_MERGE-HATCHED-"].strip().replace("mm", "").strip()
                         simplify_tol = values["-OPT_SIMPLIFY-HATCHED-"].strip().replace("mm", "").strip()
-
+                    elif is_dither:
+                        merge_tol = values["-OPT_MERGE-DITHER-"].strip().replace("mm", "").strip()
+                        simplify_tol = values["-OPT_SIMPLIFY-DITHER-"].strip().replace("mm", "").strip()
+                    else:
+                        merge_tol = "0.1"
+                        simplify_tol = "0.05"
+                    
                     cmd_string = f"linemerge -t {merge_tol}mm linesimplify -t {simplify_tol}mm linesort"
                     
                     print(f"Running command: vpype {cmd_string}")
@@ -363,12 +464,16 @@ def main():
                     if optimized_doc:
                         if is_flow:
                             flow_document = optimized_doc
-                        else:
+                        elif is_hatched:
                             hatched_document = optimized_doc
+                        elif is_dither:
+                            dither_document = optimized_doc
 
                         window[log_key].print("Optimization complete. Updating final preview.")
                         
                         is_cmyk = values["-FLOW_CMYK-"] if is_flow else values["-HATCHED_CMYK-"]
+                        if is_dither: # Dither doesn't have CMYK
+                            is_cmyk = False
                             
                         # Update the "Final Preview" tab with the optimized drawing
                         update_preview(window, optimized_doc, is_cmyk=is_cmyk)
@@ -377,13 +482,30 @@ def main():
                         window[log_key].print("Optimization failed.")
 
                 # --- Save Event ---
-                elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-"):
+                elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-", "-BTN_SAVE-DITHER-"):
                     
                     is_flow = event == "-BTN_SAVE-"
-                    doc_to_save = flow_document if is_flow else hatched_document
+                    is_hatched = event == "-BTN_SAVE-HATCHED-"
+                    is_dither = event == "-BTN_SAVE-DITHER-"
+
+                    if is_flow:
+                        doc_to_save = flow_document
+                    elif is_hatched:
+                        doc_to_save = hatched_document
+                    elif is_dither:
+                        doc_to_save = dither_document
+                    else:
+                        doc_to_save = None
 
                     if doc_to_save is None:
-                        log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                        if is_flow:
+                            log_key = "-LOG_FLOW-"
+                        elif is_hatched:
+                            log_key = "-LOG_HATCHED-"
+                        elif is_dither:
+                            log_key = "-LOG_DITHER-"
+                        else:
+                            log_key = "-LOG_FLOW-" # Default
                         window[log_key].print("Error: No document to save. Generate or optimize first.")
                         continue
 
@@ -395,7 +517,14 @@ def main():
                         file_types=(("SVG Files", "*.svg"),)
                     )
 
-                    log_key = "-LOG_FLOW-" if is_flow else "-LOG_HATCHED-"
+                    if is_flow:
+                        log_key = "-LOG_FLOW-"
+                    elif is_hatched:
+                        log_key = "-LOG_HATCHED-"
+                    elif is_dither:
+                        log_key = "-LOG_DITHER-"
+                    else:
+                        log_key = "-LOG_FLOW-" # Default
 
                     if save_path:
                         try:

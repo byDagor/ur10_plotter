@@ -1,7 +1,6 @@
 import rtde_control
 import rtde_receive
 import threading
-import numpy as np
 import time
 
 SAFE_Z_OFFSET = 0.01

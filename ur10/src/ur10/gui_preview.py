@@ -8,6 +8,8 @@ import matplotlib
 matplotlib.use('Agg')  # Use the 'Agg' backend for non-GUI rendering
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 # --------------------------------
 
 def _render_document_to_image_element(window: sg.Window, document: vpype.Document, image_key: str, is_cmyk: bool, max_size: tuple = (600, 600)):
@@ -34,10 +36,22 @@ def _render_document_to_image_element(window: sg.Window, document: vpype.Documen
             color_map = {1: 'cyan', 2: 'magenta', 3: 'yellow', 4: 'black'}
             for layer_id, line_collection in document.layers.items():
                 color = color_map.get(layer_id, 'black') if is_cmyk else 'black'
-                for line in line_collection:
-                    x_data = [p.real for p in line]
-                    y_data = [p.imag for p in line]
-                    ax.plot(x_data, y_data, color=color, linewidth=0.5)
+
+                if image_key == "-DITHER_PREVIEW_IMAGE-":
+                    patches = []
+                    for line in line_collection:
+                        if len(line) > 2 and line[0] == line[-1]:
+                            polygon_points = [(p.real, p.imag) for p in line]
+                            poly = Polygon(polygon_points, closed=True)
+                            patches.append(poly)
+                    
+                    p = PatchCollection(patches, facecolor=color, edgecolor=color, linewidth=0.1)
+                    ax.add_collection(p)
+                else:
+                    for line in line_collection:
+                        x_data = [p.real for p in line]
+                        y_data = [p.imag for p in line]
+                        ax.plot(x_data, y_data, color=color, linewidth=0.5)
         except Exception as e:
             print(f"Error during Matplotlib rendering for {image_key}: {e}")
 
@@ -71,4 +85,8 @@ def update_flow_preview(window: sg.Window, document: vpype.Document, is_cmyk: bo
 def update_hatched_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool, max_size: tuple = (600, 600)):
     """Renders to the -HATCHED_PREVIEW_IMAGE- element."""
     _render_document_to_image_element(window, document, "-HATCHED_PREVIEW_IMAGE-", is_cmyk, max_size)
+
+def update_dither_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool, max_size: tuple = (600, 600)):
+    """Renders to the -DITHER_PREVIEW_IMAGE- element."""
+    _render_document_to_image_element(window, document, "-DITHER_PREVIEW_IMAGE-", is_cmyk, max_size)
 

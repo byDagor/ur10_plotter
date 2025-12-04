@@ -570,7 +570,7 @@ def main():
 
                 # Parse levels
                 try:
-                    levels = [int(l) for l in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(l) < 255]
+                    levels = [int(level_str) for level_str in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(level_str) < 255]
                     if not levels:
                         levels = (64, 128, 192) # Default if empty
                     params["levels"] = tuple(levels)

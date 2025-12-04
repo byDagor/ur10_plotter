@@ -14,7 +14,8 @@ def _get_points_from_element(element):
         path_obj = parse_path(d)
         for subpath in path_obj.continuous_subpaths():
             points = []
-            if not subpath: continue
+            if not subpath:
+                continue
             # Add the start point of the first segment
             points.append((subpath[0].start.real, subpath[0].start.imag))
             for segment in subpath:
