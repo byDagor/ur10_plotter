@@ -52,42 +52,59 @@ class DitherPlotter:
 def _dither_task(params: dict, result_queue: multiprocessing.Queue):
     """
     The actual dithering task that runs in a separate process.
-    This version uses a robust stochastic dithering algorithm.
+    This version uses an ordered dithering algorithm with a Bayer matrix.
     """
     try:
         img_path = params["img_path"]
-        dot_radius_mm = params["dot_radius_mm"]
-        image_scale = params.get("image_scale", 0.5)
+        pen_diameter_mm = params["pen_diameter_mm"]
+        canvas_width_mm = params["canvas_width_mm"]
+        canvas_height_mm = params["canvas_height_mm"]
+        detail_multiplier = params["detail_multiplier"]
         density = params.get("density", 1.0)
 
         dither_plotter = DitherPlotter()
         dither_plotter.setup() 
 
         img = Image.open(img_path).convert("L") # Convert to grayscale/luminance
+        original_width, original_height = img.size
         
-        # Resize image based on scale
-        new_width = round(img.width * image_scale)
-        new_height = round(img.height * image_scale)
+        # Calculate h_dots based on canvas width, pen diameter, and detail multiplier
+        base_h_dots = canvas_width_mm / pen_diameter_mm
+        h_dots = round(base_h_dots * detail_multiplier)
+        h_dots = max(100, h_dots) # Ensure a minimum for reasonable output
+
+        # Calculate new image dimensions to process, preserving aspect ratio
+        aspect_ratio = original_height / original_width
+        new_width = h_dots
+        new_height = round(new_width * aspect_ratio)
         img = img.resize((new_width, new_height))
+
+        # The dot radius for drawing is half the physical pen diameter
+        dot_radius_mm = pen_diameter_mm / 2.0
 
         norm_dim = max(new_width, new_height)
         pixels = list(img.getdata())
         
+        # 4x4 Bayer matrix, normalized to 0-255 range
+        bayer_matrix = np.array([
+            [  0, 128,  32, 160],
+            [192,  64, 224,  96],
+            [ 48, 176,  16, 144],
+            [240, 112, 208,  80]
+        ])
+        
         for i, brightness in enumerate(pixels):
-            darkness = 255 - brightness
+            c = i % new_width
+            r = i // new_width
             
-            # A more robust probabilistic model for dot placement.
-            # The check value is normalized to a probability (0-1 range, although density can push it > 1).
-            # This is then compared against a random float from 0-1.
-            # The scale^2 compensation remains to keep the visual density consistent.
-            check_val = (darkness / 255.0 * density) / ((image_scale * image_scale) + 0.001)
+            # Get threshold from repeating Bayer matrix
+            threshold = bayer_matrix[r % 4, c % 4]
+            
+            # Adjust brightness with the density slider and compare to threshold
+            adjusted_brightness = brightness / (density + 0.001)
 
-            if check_val > random.random():
+            if adjusted_brightness < threshold:
                 # This is a dot
-                c = i % new_width
-                r = i // new_width
-                
-                # Normalize coordinates to a 100x100 space
                 x = (c/norm_dim) * 100 + random.uniform(-0.05, 0.05)
                 y = (r/norm_dim) * 100 + random.uniform(-0.05, 0.05)
                 dither_plotter.dot(x, y)

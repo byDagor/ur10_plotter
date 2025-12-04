@@ -103,9 +103,11 @@ def create_layout():
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
         
-        [sg.Text("Dot Radius (mm):", s=(15, 1)), sg.Input("0.1", key="-DITHER_DOT_RADIUS-", s=(10, 1))],
-        [sg.Text("Image Scale:", s=(15, 1)), sg.Slider(range=(0.01, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-DITHER_IMAGE_SCALE-", s=(30, 20))],
-        [sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.01, 2.0), default_value=1.0, resolution=0.01, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))],
+        [sg.Text("Pen Diameter (mm):", s=(15, 1)), sg.Input("0.35", key="-DITHER_PEN_DIAMETER-", s=(10, 1))],
+        [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("100", key="-DITHER_CANVAS_WIDTH-", s=(10, 1))],
+        [sg.Text("Canvas Height (mm):", s=(15, 1)), sg.Input("100", key="-DITHER_CANVAS_HEIGHT-", s=(10, 1))],
+        [sg.Text("Detail Multiplier:", s=(15, 1)), sg.Slider(range=(0.5, 2.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_DETAIL_MULTIPLIER-", s=(30, 20))],
+        [sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 2.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))],
         
         [
             sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"),
@@ -162,9 +164,11 @@ def create_layout():
         [sg.Text("Draw Hatch Fill:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the shading lines inside the contours.", size=(DESC_W, None))],
 
         [sg.Text("Dither Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
-        [sg.Text("Dot Radius (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The radius of each dot in the final drawing. (mm)", size=(DESC_W, None))],
-        [sg.Text("Image Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Downscales image before processing. 0.5 = 50%. Improves performance. (Ratio)", size=(DESC_W, None))],
-        [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls the probability of dots appearing in dark areas. Higher values create a denser, darker image. (Multiplier)", size=(DESC_W, None))],
+        [sg.Text("Pen Diameter (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical diameter of the pen/marker tip being used. (mm)", size=(DESC_W, None))],
+        [sg.Text("Canvas Width (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical width of the canvas you are plotting on. (mm)", size=(DESC_W, None))],
+        [sg.Text("Canvas Height (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The physical height of the canvas you are plotting on. (mm)", size=(DESC_W, None))],
+        [sg.Text("Detail Multiplier:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Adjusts the effective dot resolution. A higher value samples the image more finely. (Multiplier)", size=(DESC_W, None))],
+        [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls the overall darkness of the image by adjusting brightness before dithering is applied.", size=(DESC_W, None))],
 
         [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],

@@ -259,13 +259,37 @@ def main():
                     # --- PARSE ALL PARAMETERS ---
                     params = {}
                     params["img_path"] = img_path
-                    params["image_scale"] = values["-DITHER_IMAGE_SCALE-"]
-                    params["density"] = values["-DITHER_DENSITY-"]
                     try:
-                        params["dot_radius_mm"] = float(values["-DITHER_DOT_RADIUS-"].strip())
+                        params["pen_diameter_mm"] = float(values["-DITHER_PEN_DIAMETER-"].strip())
+                        params["canvas_width_mm"] = float(values["-DITHER_CANVAS_WIDTH-"].strip())
+                        params["canvas_height_mm"] = float(values["-DITHER_CANVAS_HEIGHT-"].strip())
+                        params["detail_multiplier"] = values["-DITHER_DETAIL_MULTIPLIER-"]
+                        params["density"] = values["-DITHER_DENSITY-"]
                     except ValueError:
-                        print(f"Invalid Dot Radius: {values['-DITHER_DOT_RADIUS-']}. Using 0.1.")
-                        params["dot_radius_mm"] = 0.1
+                        print("Error: Invalid input for Pen Diameter, Canvas Width, or Canvas Height. Please enter numbers.")
+                        continue
+                    
+                    # Calculate effective resolution and dot radius
+                    pen_diameter_mm = params["pen_diameter_mm"]
+                    canvas_width_mm = params["canvas_width_mm"]
+                    # canvas_height_mm = params["canvas_height_mm"] # Not directly used in h_dots calc, but in dither_task
+                    detail_multiplier = params["detail_multiplier"]
+
+                    # Determine optimal h_dots based on canvas width and pen diameter
+                    # Each 'pixel' in the dithered image corresponds to a potential dot location.
+                    # We want to fit canvas_width_mm / pen_diameter_mm dots across the width,
+                    # and then scale that by the detail_multiplier.
+                    base_h_dots = canvas_width_mm / pen_diameter_mm
+                    h_dots = round(base_h_dots * detail_multiplier)
+
+                    # Ensure h_dots is not too small for reasonable output
+                    h_dots = max(100, h_dots) 
+                    
+                    # The dot radius in the output vpype document is half the physical pen diameter
+                    dot_radius_mm = pen_diameter_mm / 2.0
+                    
+                    params["h_dots"] = h_dots
+                    params["dot_radius_mm"] = dot_radius_mm
                     # --- END PARSING ---
                     
                     # --- THREADING LOGIC ---
