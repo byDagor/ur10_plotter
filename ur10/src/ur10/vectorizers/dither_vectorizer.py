@@ -52,7 +52,7 @@ class DitherPlotter:
 def _dither_task(params: dict, result_queue: multiprocessing.Queue):
     """
     The actual dithering task that runs in a separate process.
-    This version uses a stochastic dithering algorithm.
+    This version uses a robust stochastic dithering algorithm.
     """
     try:
         img_path = params["img_path"]
@@ -74,16 +74,15 @@ def _dither_task(params: dict, result_queue: multiprocessing.Queue):
         pixels = list(img.getdata())
         
         for i, brightness in enumerate(pixels):
-            # The `darkness` is 255 - brightness.
-            # We compare the amplified darkness to a random number.
             darkness = 255 - brightness
             
-            # Divide by scale^2 to make the final dot density independent of the scale.
-            # Scale controls the resolution, Density controls the final output darkness.
-            # Add a small epsilon to avoid division by zero, although slider min is 0.1.
-            check_val = (darkness * density) / ((image_scale * image_scale) + 0.001)
+            # A more robust probabilistic model for dot placement.
+            # The check value is normalized to a probability (0-1 range, although density can push it > 1).
+            # This is then compared against a random float from 0-1.
+            # The scale^2 compensation remains to keep the visual density consistent.
+            check_val = (darkness / 255.0 * density) / ((image_scale * image_scale) + 0.001)
 
-            if check_val > random.randint(0, 255):
+            if check_val > random.random():
                 # This is a dot
                 c = i % new_width
                 r = i // new_width
