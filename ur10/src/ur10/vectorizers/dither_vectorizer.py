@@ -43,25 +43,37 @@ class DitherVectorizer:
         return self.get_document()
 
     def fs_dither(self, img, new_width, new_height):
-        pixels = np.array(img, dtype=np.float32)
-        norm_dim = max(new_width, new_height)
+        # Use a standard list of lists for pixels, based on the user's working example
+        flat_data = list(img.getdata())
+        pixels = [flat_data[i * new_width:(i + 1) * new_width] for i in range(new_height)]
 
-        for r in range(new_height - 1):
-            for c in range(1, new_width - 1):
-                oldpixel = pixels[r, c]
-                newpixel = 255.0 if oldpixel > self.luminance_threshold else 0.0
-                pixels[r, c] = newpixel
+        for y in range(new_height):
+            for x in range(new_width):
+                old_pixel = pixels[y][x]
+                # Use the adjustable threshold from the class instance
+                new_pixel = 255 if old_pixel > self.luminance_threshold else 0
+                pixels[y][x] = new_pixel
                 
-                if newpixel == 0.0:
-                    x = (c / norm_dim) * 100 + random.uniform(-0.05, 0.05)
-                    y = (r / norm_dim) * 100 + random.uniform(-0.05, 0.05)
-                    self.points.append((x, y))
-                
-                quant_error = oldpixel - newpixel
-                pixels[r, c + 1] += quant_error * 7 / 16
-                pixels[r + 1, c - 1] += quant_error * 3 / 16
-                pixels[r + 1, c] += quant_error * 5 / 16
-                pixels[r + 1, c + 1] += quant_error * 1 / 16
+                error = old_pixel - new_pixel
+
+                # Distribute error with boundary checking
+                if x + 1 < new_width:
+                    pixels[y][x + 1] += error * 7 / 16
+                if x - 1 >= 0 and y + 1 < new_height:
+                    pixels[y + 1][x - 1] += error * 3 / 16
+                if y + 1 < new_height:
+                    pixels[y + 1][x] += error * 5 / 16
+                if x + 1 < new_width and y + 1 < new_height:
+                    pixels[y + 1][x + 1] += error * 1 / 16
+
+        # Generate points from the dithered data
+        norm_dim = max(new_width, new_height)
+        for y in range(new_height):
+            for x in range(new_width):
+                if pixels[y][x] == 0:
+                    px = (x / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    py = (y / norm_dim) * 100 + random.uniform(-0.05, 0.05)
+                    self.points.append((px, py))
 
     def ordered_dither(self, img, new_width, new_height):
         pixels = np.array(img, dtype=np.float32)
