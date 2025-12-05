@@ -270,9 +270,9 @@ def main():
                         params["density"] = values["-DITHER_DENSITY-"]
                         
                         if values["-DITHER_METHOD-"] == "Floyd-Steinberg":
-                            params["threshold"] = int(values["-DITHER_THRESHOLD-"])
+                            params["contrast_factor"] = values["-DITHER_CONTRAST-"]
                         else:
-                            params["threshold"] = 127 # Default value for other methods
+                            params["contrast_factor"] = 1.0 # Default value for other methods
                         
                         # Calculate dot radius for the output SVG from physical pen size
                         params["dot_radius_mm"] = params["pen_diameter_mm"] / 2.0
@@ -297,10 +297,10 @@ def main():
                 # --- Dither Method Change Event ---
                 elif event == "-DITHER_METHOD-":
                     if values[event] == "Floyd-Steinberg":
-                        window['-COL_THRESHOLD-'].update(visible=True)
+                        window['-COL_CONTRAST-'].update(visible=True)
                         window['-COL_DENSITY-'].update(visible=False)
                     else:
-                        window['-COL_THRESHOLD-'].update(visible=False)
+                        window['-COL_CONTRAST-'].update(visible=False)
                         window['-COL_DENSITY-'].update(visible=True)
                 
                 # --- Event for when the thread is done ---

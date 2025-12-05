@@ -5,17 +5,17 @@ import numpy as np
 import threading
 import time
 import traceback
-from PIL import Image 
+from PIL import Image, ImageEnhance
 import random
 import os
 import multiprocessing
 import tempfile
 
 class DitherVectorizer:
-    def __init__(self, image_path: str, dither_method: str, luminance_threshold: int = 127, density: float = 1.0, h_dots: int = 150, dot_radius_mm: float = 0.175):
+    def __init__(self, image_path: str, dither_method: str, contrast_factor: float = 1.0, density: float = 1.0, h_dots: int = 150, dot_radius_mm: float = 0.175):
         self.image_path = image_path
         self.dither_method = dither_method
-        self.luminance_threshold = luminance_threshold
+        self.contrast_factor = contrast_factor
         self.density = density
         self.h_dots = h_dots
         self.dot_radius_mm = dot_radius_mm
@@ -43,15 +43,19 @@ class DitherVectorizer:
         return self.get_document()
 
     def fs_dither(self, img, new_width, new_height):
-        # Use a standard list of lists for pixels, based on the user's working example
+        # Apply contrast enhancement
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(self.contrast_factor)
+
+        # Use a standard list of lists for pixels
         flat_data = list(img.getdata())
         pixels = [flat_data[i * new_width:(i + 1) * new_width] for i in range(new_height)]
 
         for y in range(new_height):
             for x in range(new_width):
                 old_pixel = pixels[y][x]
-                # Use the adjustable threshold from the class instance
-                new_pixel = 255 if old_pixel > self.luminance_threshold else 0
+                # A fixed threshold is fine after contrast adjustment
+                new_pixel = 255 if old_pixel > 127 else 0
                 pixels[y][x] = new_pixel
                 
                 error = old_pixel - new_pixel
@@ -129,7 +133,7 @@ def _dither_task(params: dict, result_queue: multiprocessing.Queue):
         vectorizer = DitherVectorizer(
             image_path=params["img_path"],
             dither_method=params.get("method", "Floyd-Steinberg"),
-            luminance_threshold=params.get("threshold", 127),
+            contrast_factor=params.get("contrast_factor", 1.0),
             density=params.get("density", 1.0),
             h_dots=params.get("h_dots", 150),
             dot_radius_mm=params.get("dot_radius_mm", 0.175)
@@ -160,9 +164,12 @@ def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Ev
         f"Method: {params.get('method')}, "
         f"H-Dots: {params.get('h_dots')}, "
         f"Pen Diameter: {params.get('pen_diameter_mm')}mm, "
-        f"Threshold: {params.get('threshold')}, "
-        f"Density: {params.get('density')}"
     )
+    if params.get('method') == "Floyd-Steinberg":
+        param_str += f"Contrast: {params.get('contrast_factor')}"
+    else:
+        param_str += f"Density: {params.get('density')}"
+    
     window.write_event_value("-LOG_MESSAGE-", f"Dithering with params: {param_str}")
 
     result_queue = multiprocessing.Queue()

@@ -112,11 +112,11 @@ def create_layout():
         
         [sg.Text("Dithering Method:", s=(15,1)), sg.DropDown(["Floyd-Steinberg", "Ordered (Halftone)", "Stochastic (Random)"], default_value="Floyd-Steinberg", key="-DITHER_METHOD-", s=(30,1), enable_events=True)],
         
-        # Column for Threshold slider (for Floyd-Steinberg)
+        # Column for Contrast slider (for Floyd-Steinberg)
         [sg.Column([[
-            sg.Text("Luminance Threshold:", s=(15, 1)), 
-            sg.Slider(range=(0, 255), default_value=127, resolution=1, orientation="h", key="-DITHER_THRESHOLD-", s=(30, 20))
-        ]], key='-COL_THRESHOLD-')],
+            sg.Text("Contrast:", s=(15, 1)), 
+            sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))
+        ]], key='-COL_CONTRAST-')],
 
         # Column for Density slider (for Ordered and Stochastic)
         [sg.Column([[
@@ -185,7 +185,7 @@ def create_layout():
         [sg.Text("  - Floyd-Steinberg:", font="Helvetica 10", size=(LBL_W,1)), sg.Text("High-quality, organic-looking error diffusion.", size=(DESC_W, None))],
         [sg.Text("  - Ordered (Halftone):", font="Helvetica 10", size=(LBL_W,1)), sg.Text("Clean, structured, grid-like patterns.", size=(DESC_W, None))],
         [sg.Text("  - Stochastic (Random):", font="Helvetica 10", size=(LBL_W,1)), sg.Text("Noisy, organic, but potentially messy pattern.", size=(DESC_W, None))],
-        [sg.Text("Luminance Threshold:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Floyd-Steinberg. The brightness cutoff between black and white. (0-255)", size=(DESC_W, None))],
+        [sg.Text("Contrast:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Floyd-Steinberg. Adjusts image contrast before dithering. 1.0 is normal.", size=(DESC_W, None))],
         [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Ordered and Stochastic methods. Adjusts the overall darkness. (Multiplier)", size=(DESC_W, None))],
 
         [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
