@@ -44,7 +44,6 @@ def _render_document_to_image_element(window: sg.Window, document: vpype.Documen
                             polygon_points = [(p.real, p.imag) for p in line]
                             poly = Polygon(polygon_points, closed=True)
                             patches.append(poly)
-                    
                     p = PatchCollection(patches, facecolor=color, edgecolor=color, linewidth=0.1)
                     ax.add_collection(p)
                 else:
@@ -86,7 +85,7 @@ def update_hatched_preview(window: sg.Window, document: vpype.Document, is_cmyk:
     """Renders to the -HATCHED_PREVIEW_IMAGE- element."""
     _render_document_to_image_element(window, document, "-HATCHED_PREVIEW_IMAGE-", is_cmyk, max_size)
 
-def update_dither_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool, max_size: tuple = (600, 600)):
+def update_dither_preview(window: sg.Window, document: vpype.Document, max_size: tuple = (600, 600)):
     """Renders to the -DITHER_PREVIEW_IMAGE- element."""
-    _render_document_to_image_element(window, document, "-DITHER_PREVIEW_IMAGE-", is_cmyk, max_size)
+    _render_document_to_image_element(window, document, "-DITHER_PREVIEW_IMAGE-", False, max_size)
 

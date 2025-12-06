@@ -16,6 +16,7 @@ from vectorizers.hatched_vectorizer import run_hatched_thread
 from vectorizers.dither_vectorizer import run_dither_thread
 from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
 from robot.svg_parser import parse_svg
+from dither_converter import _convert_dither_circles_to_points
 
 
 def main():
@@ -366,7 +367,7 @@ def main():
                             window["-TAB_HATCHED_PREVIEW-"].select()
                         elif "Dither" in message:
                             dither_document = doc_from_thread
-                            update_dither_preview(window, dither_document, is_cmyk)
+                            update_dither_preview(window, dither_document)
                             window["-TAB_DITHER_PREVIEW-"].select()
                     else:
                         if "Flow Imager" in message:
@@ -387,7 +388,7 @@ def main():
                         # Also clear the previews
                         update_flow_preview(window, None, is_cmyk=False)
                         update_hatched_preview(window, None, is_cmyk=False)
-                        update_dither_preview(window, None, is_cmyk=False)
+                        update_dither_preview(window, None)
                 
                 # --- Vectorizer Stop Events ---
                 elif event == "-BTN_STOP_FLOW-":
@@ -440,6 +441,9 @@ def main():
                         doc_to_optimize = hatched_document
                     elif is_dither:
                         doc_to_optimize = dither_document
+                        if doc_to_optimize:
+                            window["-LOG_DITHER-"].print("Converting dither circles to points for optimization...")
+                            doc_to_optimize = _convert_dither_circles_to_points(doc_to_optimize)
                     else:
                         doc_to_optimize = None # Should not happen
 
@@ -517,6 +521,9 @@ def main():
                         doc_to_save = hatched_document
                     elif is_dither:
                         doc_to_save = dither_document
+                        if doc_to_save:
+                            window["-LOG_DITHER-"].print("Converting dither circles to points for saving...")
+                            doc_to_save = _convert_dither_circles_to_points(doc_to_save)
                     else:
                         doc_to_save = None
 
