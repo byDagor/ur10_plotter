@@ -112,6 +112,25 @@ class UR10Controller:
 
                 point_idx += 1
 
+                # --- Stop Logic (checks after a line is completed) ---
+                if self.stop_event.is_set():
+                    print("Stop command received during drawing. Finishing line, lifting pen, and going home.")
+                    
+                    # 1. Get current position and lift pen
+                    stopped_pose_at_line_end = self.get_current_pose()
+                    if not dry_run and stopped_pose_at_line_end:
+                        pen_up_pose = list(stopped_pose_at_line_end)
+                        pen_up_pose[2] = safe_z
+                        self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
+
+                    # 2. Go to home position
+                    self.go_home(home_pose, speed=0.5, acceleration=acceleration)
+                    
+                    # 3. Send stopped message and exit thread
+                    window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution stopped.", False))
+                    print("Path execution stopped by user.")
+                    return # Exit the function immediately
+
                 # --- Pause Logic (checks after a line is completed) ---
                 if self.pause_event.is_set():
                     print("Pause command received. Finishing line and pausing.")
@@ -162,13 +181,24 @@ class UR10Controller:
             path_idx += 1
 
         # Final actions
-        self.go_home(home_pose, acceleration=acceleration)
-        if not self.stop_event.is_set():
-            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
-            print("Path execution complete.")
-        else:
+        if self.stop_event.is_set():
+            print("Stop command received. Lifting pen and going home.")
+            current_pose_at_stop = self.get_current_pose()
+            # Ensure pen is up before going home
+            if not dry_run and current_pose_at_stop:
+                safe_z = home_pose[2] + SAFE_Z_OFFSET
+                if current_pose_at_stop[2] < safe_z: # Check if pen is down
+                    pen_up_pose = list(current_pose_at_stop)
+                    pen_up_pose[2] = safe_z
+                    self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
+            
+            self.go_home(home_pose, acceleration=acceleration)
             window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution stopped.", False))
             print("Path execution stopped by user.")
+        else:
+            self.go_home(home_pose, acceleration=acceleration)
+            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
+            print("Path execution complete.")
 
     def go_home(self, home_pose, speed=0.5, acceleration=1.2):
         """
