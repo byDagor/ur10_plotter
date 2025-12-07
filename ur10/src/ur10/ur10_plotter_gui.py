@@ -10,7 +10,7 @@ import json
 import math
 
 from gui_layout import create_layout
-from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview, update_dither_preview
+from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview, update_dither_preview, preview_dots_from_svg
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from vectorizers.dither_vectorizer import run_dither_thread
@@ -413,17 +413,22 @@ def main():
                 elif event == "-SVG_PATH-":
                     file_path = values["-SVG_PATH-"]
                     if file_path and os.path.exists(file_path):
-                        try:
-                            # Load the SVG into a document
-                            doc = execute(f'read "{file_path}"')
-                            # Update the preview image
-                            update_svg_preview(window, doc)
-                            # Switch to the preview tab
-                            window["-TAB_SVG_PREVIEW-"].select()
-                        except Exception as e:
-                            print(f"Error loading SVG for preview: {e}")
-                            # Clear the preview if loading fails
-                            update_svg_preview(window, None)
+                        render_as_dots = values["-RENDER_AS_DOTS-"]
+                        
+                        if render_as_dots:
+                            # Use the manual parser for dot files, bypassing vpype's read
+                            preview_dots_from_svg(window, file_path)
+                        else:
+                            # Use vpype's read for standard SVG files
+                            try:
+                                doc = execute(f'read "{file_path}"')
+                                update_svg_preview(window, doc)
+                            except Exception as e:
+                                window["-UR10_STATUS-"].print(f"Error loading SVG with vpype: {e}")
+                                update_svg_preview(window, None)
+                        
+                        # Switch to the preview tab
+                        window["-TAB_SVG_PREVIEW-"].select()
                     else:
                         # Clear the preview if path is invalid
                         update_svg_preview(window, None)

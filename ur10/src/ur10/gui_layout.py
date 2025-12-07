@@ -214,6 +214,7 @@ def create_layout():
         [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1), enable_events=True), sg.FileBrowse(target="-SVG_PATH-")],
+        [sg.Checkbox("Render SVG as dots (for dithered files)", key="-RENDER_AS_DOTS-", default=False)],
         [sg.Text("Home Position:", s=(15,1)), sg.Input("Not Set", key="-HOME_POSE_DISPLAY-", s=(30,1), disabled=True)],
         [
             sg.Button("Set Home to Current Position", key="-BTN_SET_HOME-", expand_x=True, disabled=True),
