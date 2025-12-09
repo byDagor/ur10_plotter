@@ -48,16 +48,18 @@ def main():
     except (json.JSONDecodeError, KeyError):
         print("Error reading home_config.json. File might be corrupted.")
 
-    window["-GRAPH-"].hide_row()
-    # document: Union[vpype.Document, None] = None
     flow_document: Union[vpype.Document, None] = None
     hatched_document: Union[vpype.Document, None] = None
     dither_document: Union[vpype.Document, None] = None
 
     ur10_controller: Union[UR10Controller, None] = None
-    svg_path_list = []
     scaled_dims = {"width": 0, "height": 0}
-    update_preview(window, None, is_cmyk=False) # Pass default CMYK flag
+    
+    # Clear all previews at startup
+    update_flow_preview(window, None, is_cmyk=False)
+    update_hatched_preview(window, None, is_cmyk=False)
+    update_dither_preview(window, None)
+    update_svg_preview(window, None)
 
     # --- Event Loop ---
     try:
@@ -76,7 +78,6 @@ def main():
                 elif active_tab == "-TAB_DITHER-":
                     window["-LOG_DITHER-"].print(values[event])
                 else:
-                    # Fallback for any other case
                     print(f"Log message from unhandled tab '{active_tab}': {values[event]}")
                 continue
             
@@ -84,13 +85,11 @@ def main():
                 # --- Vectorize Image Event ---
                 if event == "-BTN_VECTORIZE_FLOW-":
                     print("Vectorizing image with Flow Imager...")
-                    
                     img_path = values["-IMG_PATH_FLOW-"]
                     noise_str = values["-FLOW_NOISE-"].strip()
                     min_sep = values["-FLOW_MIN_SEP-"]
                     max_sep = values["-FLOW_MAX_SEP-"]
                     cmyk = values["-FLOW_CMYK-"]
-                    
                     n_fields = int(values["-FLOW_N_FIELDS-"])
                     min_len_str = values["-FLOW_MIN_LEN-"].strip().replace("mm", "").strip()
                     max_len_str = values["-FLOW_MAX_LEN-"].strip().replace("mm", "").strip()
@@ -100,86 +99,47 @@ def main():
                     rotate = int(values["-FLOW_ROTATE-"])
                     kdt = values["-FLOW_KDT-"]
                     trim = values["-FLOW_TRIM-"]
-                    
                     if not img_path or not os.path.exists(img_path):
                         print(f"Error: Image file not found or not specified: {img_path}")
                         continue
-                    
                     try:
                         noise = float(noise_str)
                         cmd_string = f"flow_img -nc {noise} -ms {min_sep}mm -Ms {max_sep}mm"
                     except ValueError:
                         print(f"Invalid Noise Coeff: {noise_str}. Must be a number.")
                         continue
-                        
-                    if n_fields != 1:
-                        cmd_string += f" -nf {n_fields}"
-                        
+                    if n_fields != 1: cmd_string += f" -nf {n_fields}"
                     try:
                         min_len = float(min_len_str)
-                        if min_len > 0:
-                            cmd_string += f" -ml {min_len}mm"
-                    except ValueError:
-                        print(f"Ignoring invalid Min Length: {min_len_str}")
-
+                        if min_len > 0: cmd_string += f" -ml {min_len}mm"
+                    except ValueError: print(f"Ignoring invalid Min Length: {min_len_str}")
                     try:
                         max_len = float(max_len_str)
-                        if max_len > 0:
-                            cmd_string += f" -Ml {max_len}mm"
-                    except ValueError:
-                        print(f"Ignoring invalid Max Length: {max_len_str}")
-
+                        if max_len > 0: cmd_string += f" -Ml {max_len}mm"
+                    except ValueError: print(f"Ignoring invalid Max Length: {max_len_str}")
                     try:
                         max_size = int(max_size_str)
-                        if max_size > 0:
-                            cmd_string += f" --max_size {max_size}"
-                    except ValueError:
-                        print(f"Ignoring invalid Max Size: {max_size_str}")
-
-                    if edge_flow != 1.0:
-                        cmd_string += f" -efm {edge_flow}"
-                    
-                    if dark_flow != 1.0:
-                        cmd_string += f" -dfm {dark_flow}"
-                    
-                    if rotate != 0:
-                        cmd_string += f" --rotate {rotate}"
-                    
-                    if cmyk:
-                        cmd_string += " --cmyk"
-                    
-                    if kdt:
-                        cmd_string += " -kdt"
-                    
-                    if trim:
-                        cmd_string += " -tm"
-                    
+                        if max_size > 0: cmd_string += f" --max_size {max_size}"
+                    except ValueError: print(f"Ignoring invalid Max Size: {max_size_str}")
+                    if edge_flow != 1.0: cmd_string += f" -efm {edge_flow}"
+                    if dark_flow != 1.0: cmd_string += f" -dfm {dark_flow}"
+                    if rotate != 0: cmd_string += f" --rotate {rotate}"
+                    if cmyk: cmd_string += " --cmyk"
+                    if kdt: cmd_string += " -kdt"
+                    if trim: cmd_string += " -tm"
                     cmd_string += f" \"{img_path}\""
-                    
-                    # --- THREADING LOGIC ---
                     window["-LOG_FLOW-"].print("Starting Flow Imager vectorization... please wait.")
                     stop_flow_event.clear()
                     window["-BTN_VECTORIZE_FLOW-"].update(disabled=True)
                     window["-BTN_STOP_FLOW-"].update(disabled=False)
-                    
-                    # 2. Start the worker thread
-                    threading.Thread(
-                        target=run_vectorize_thread,
-                        args=(window, cmd_string, cmyk, stop_flow_event), # Pass the CMYK flag and stop event
-                        daemon=True
-                    ).start()
-                    # -----------------------------
-                
-                # --- Hatched Vectorize Event ---
+                    threading.Thread(target=run_vectorize_thread, args=(window, cmd_string, cmyk, stop_flow_event), daemon=True).start()
+
                 elif event == "-BTN_VECTORIZE_HATCHED-":
                     print("Vectorizing image with Hatched...")
-                    
                     img_path = values["-IMG_PATH_HATCHED-"]
                     if not img_path or not os.path.exists(img_path):
                         print(f"Error: Image file not found or not specified: {img_path}")
                         continue
-                    
-                    # --- PARSE ALL PARAMETERS ---
                     params = {}
                     params["img_path"] = img_path
                     params["cmyk"] = values["-HATCHED_CMYK-"]
@@ -191,111 +151,65 @@ def main():
                     params["circular"] = values["-HATCHED_CIRCULAR-"]
                     params["image_scale"] = values["-HATCHED_SCALE-"]
                     params["h_mirror"] = values["-HATCHED_HMIRROR-"]
-
-                    # Parse interpolation
                     params["interpolation"] = cv2.INTER_LINEAR if values["-HATCHED_INTERP-"] == "INTER_LINEAR" else cv2.INTER_NEAREST
-                    
-                    # Parse offset
-                    try:
-                        params["offset"] = float(values["-HATCHED_OFFSET-"].strip())
+                    try: params["offset"] = float(values["-HATCHED_OFFSET-"].strip())
                     except ValueError:
                         print(f"Invalid Offset: {values['-HATCHED_OFFSET-']}. Using 0.0.")
                         params["offset"] = 0.0
-                    
-                    # Parse center
                     try:
                         center_coords = [float(c) for c in values["-HATCHED_CENTER-"].strip().split()]
-                        if len(center_coords) == 2:
-                            params["center"] = (center_coords[0], center_coords[1])
-                        else:
-                            raise ValueError("Center must be two numbers")
+                        if len(center_coords) == 2: params["center"] = (center_coords[0], center_coords[1])
+                        else: raise ValueError("Center must be two numbers")
                     except ValueError:
                         print(f"Invalid Center: {values['-HATCHED_CENTER-']}. Using (0.5, 0.5).")
                         params["center"] = (0.5, 0.5)
-
-                    # Parse angles
                     try:
                         angles = [float(a) for a in values["-HATCHED_ANGLES-"].strip().split()]
-                        if not angles:
-                            angles = [45.0] # Default if empty
+                        if not angles: angles = [45.0]
                         params["angle"] = angles
-                        print(f"Using hatch angles: {angles}")
-                        
                     except ValueError:
                         print(f"Invalid Hatch Angles: {values['-HATCHED_ANGLES-']}. Using 45.")
-                        params["angle"] = [45.0] # Pass as a list
-
-                    # Parse levels
+                        params["angle"] = [45.0]
                     try:
                         levels = [int(level_str) for level_str in values["-HATCHED_LEVELS-"].strip().split() if 0 < int(level_str) < 255]
-                        if not levels:
-                            levels = (64, 128, 192) # Default if empty
+                        if not levels: levels = (64, 128, 192)
                         params["levels"] = tuple(levels)
                     except ValueError:
                         print(f"Invalid Levels: {values['-HATCHED_LEVELS-']}. Using defaults.")
                         params["levels"] = (64, 128, 192)
-                    # --- END PARSING ---
-                    
-                    # --- THREADING LOGIC ---
                     window["-LOG_HATCHED-"].print("Starting Hatched vectorization... please wait.")
                     stop_hatched_event.clear()
                     window["-BTN_VECTORIZE_HATCHED-"].update(disabled=True)
                     window["-BTN_STOP_HATCHED-"].update(disabled=False)
-                    
-                    threading.Thread(
-                        target=run_hatched_thread, # Call the thread function
-                        args=(window, params, stop_hatched_event),      # Pass the parsed params dict and stop event
-                        daemon=True
-                    ).start()
+                    threading.Thread(target=run_hatched_thread, args=(window, params, stop_hatched_event), daemon=True).start()
 
-                # --- Dither Vectorize Event ---
                 elif event == "-BTN_VECTORIZE_DITHER-":
                     print("Vectorizing image with Dither...")
-                    
                     img_path = values["-IMG_PATH_DITHER-"]
                     if not img_path or not os.path.exists(img_path):
                         print(f"Error: Image file not found or not specified: {img_path}")
                         continue
-                    
-                    # --- PARSE ALL PARAMETERS ---
                     params = {}
                     params["img_path"] = img_path
                     params["method"] = values["-DITHER_METHOD-"]
-                    
                     try:
-                        # Physical and artistic controls
                         params["pen_diameter_mm"] = float(values["-DITHER_PEN_DIAMETER-"].strip())
                         params["canvas_width_mm"] = float(values["-DITHER_CANVAS_WIDTH-"].strip())
                         params["canvas_height_mm"] = float(values["-DITHER_CANVAS_HEIGHT-"].strip())
                         params["h_dots"] = int(values["-DITHER_H_DOTS-"])
                         params["density"] = values["-DITHER_DENSITY-"]
-                        
-                        if values["-DITHER_METHOD-"] == "Floyd-Steinberg":
-                            params["contrast_factor"] = values["-DITHER_CONTRAST-"]
-                        else:
-                            params["contrast_factor"] = 1.0 # Default value for other methods
-                        
-                        # Calculate dot radius for the output SVG from physical pen size
+                        if values["-DITHER_METHOD-"] == "Floyd-Steinberg": params["contrast_factor"] = values["-DITHER_CONTRAST-"]
+                        else: params["contrast_factor"] = 1.0
                         params["dot_radius_mm"] = params["pen_diameter_mm"] / 2.0
-
                     except (ValueError, ZeroDivisionError) as e:
                         print(f"Error: Invalid numeric input. Please check your values. ({e})")
                         continue
-                    # --- END PARSING ---
-                    
-                    # --- THREADING LOGIC ---
                     window["-LOG_DITHER-"].print("Starting Dither vectorization... please wait.")
                     stop_dither_event.clear()
                     window["-BTN_VECTORIZE_DITHER-"].update(disabled=True)
                     window["-BTN_STOP_DITHER-"].update(disabled=False)
-                    
-                    threading.Thread(
-                        target=run_dither_thread, # Call the thread function
-                        args=(window, params, stop_dither_event),      # Pass the parsed params dict and stop event
-                        daemon=True
-                    ).start()
+                    threading.Thread(target=run_dither_thread, args=(window, params, stop_dither_event), daemon=True).start()
 
-                # --- Dither Method Change Event ---
                 elif event == "-DITHER_METHOD-":
                     if values[event] == "Floyd-Steinberg":
                         window['-COL_CONTRAST-'].update(visible=True)
@@ -306,10 +220,8 @@ def main():
                 
                 # --- Event for when the thread is done ---
                 elif event == "-THREAD_DONE-":
-                    # 1. Get results from the event
                     doc_from_thread, message, is_cmyk = values[event]
                     
-                    # Check if this is from the robot thread
                     if message in ("Real-time path execution complete.", "Real-time path execution stopped."):
                         window["-UR10_STATUS-"].print(message)
                         window["-BTN_START-"].update(disabled=False)
@@ -319,18 +231,11 @@ def main():
                         window["-BTN_CHECK_CANVAS-"].update(disabled=False)
                         continue
 
-                    # Check if the task was stopped by the user
-                    if "Flow Imager" in message and stop_flow_event.is_set():
-                        # This was a stale event from a stopped thread, ignore it
-                        continue
-                    if "Hatched" in message and stop_hatched_event.is_set():
-                        # This was a stale event from a stopped thread, ignore it
-                        continue
-                    if "Dither" in message and stop_dither_event.is_set(): # NEW
-                        # This was a stale event from a stopped thread, ignore it
+                    if ("Flow Imager" in message and stop_flow_event.is_set()) or \
+                       ("Hatched" in message and stop_hatched_event.is_set()) or \
+                       ("Dither" in message and stop_dither_event.is_set()):
                         continue
 
-                    # 2. Re-enable buttons and hide loading text
                     if "Flow Imager" in message:
                         window["-BTN_VECTORIZE_FLOW-"].update(disabled=False)
                         window["-BTN_STOP_FLOW-"].update(disabled=True)
@@ -341,51 +246,34 @@ def main():
                         window["-BTN_VECTORIZE_DITHER-"].update(disabled=False)
                         window["-BTN_STOP_DITHER-"].update(disabled=True)
                     
-                    # 3. Handle results
                     if message not in ("Flow Imager vectorization complete.", "Hatched vectorization complete.", "Dither vectorization complete."):
                         print(f"Thread Error: {message}")
                         sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
-                        if "Flow Imager" in message:
-                            log_key = "-LOG_FLOW-"
-                        elif "Hatched" in message:
-                            log_key = "-LOG_HATCHED-"
-                        elif "Dither" in message:
-                            log_key = "-LOG_DITHER-"
-                        else:
-                            log_key = "-LOG_FLOW-" # Fallback
+                        log_key = "-LOG_FLOW-"
+                        if "Hatched" in message: log_key = "-LOG_HATCHED-"
+                        elif "Dither" in message: log_key = "-LOG_DITHER-"
                         window[log_key].print(message)
                         
-                        # Call the specific preview function and select the tab
                         if "Flow Imager" in message:
                             flow_document = doc_from_thread
                             update_flow_preview(window, flow_document, is_cmyk)
-                            window["-TAB_FLOW_PREVIEW-"].select()
                         elif "Hatched" in message:
                             hatched_document = doc_from_thread
                             update_hatched_preview(window, hatched_document, is_cmyk)
-                            window["-TAB_HATCHED_PREVIEW-"].select()
                         elif "Dither" in message:
                             dither_document = doc_from_thread
                             update_dither_preview(window, dither_document)
-                            window["-TAB_DITHER_PREVIEW-"].select()
                     else:
-                        if "Flow Imager" in message:
-                            log_key = "-LOG_FLOW-"
-                        elif "Hatched" in message:
-                            log_key = "-LOG_HATCHED-"
-                        elif "Dither" in message:
-                            log_key = "-LOG_DITHER-"
-                        else:
-                            log_key = "-LOG_FLOW-" # Fallback
+                        log_key = "-LOG_FLOW-"
+                        if "Hatched" in message: log_key = "-LOG_HATCHED-"
+                        elif "Dither" in message: log_key = "-LOG_DITHER-"
                         window[log_key].print("Thread finished but document is empty.")
-                        if "Flow Imager" in message:
-                            flow_document = None
-                        elif "Hatched" in message:
-                            hatched_document = None
-                        elif "Dither" in message:
-                            dither_document = None
-                        # Also clear the previews
+
+                        if "Flow Imager" in message: flow_document = None
+                        elif "Hatched" in message: hatched_document = None
+                        elif "Dither" in message: dither_document = None
+                        
                         update_flow_preview(window, None, is_cmyk=False)
                         update_hatched_preview(window, None, is_cmyk=False)
                         update_dither_preview(window, None)
@@ -416,21 +304,16 @@ def main():
                         render_as_dots = values["-RENDER_AS_DOTS-"]
                         
                         if render_as_dots:
-                            # Use the manual parser for dot files, bypassing vpype's read
                             preview_dots_from_svg(window, file_path)
                         else:
-                            # Use vpype's read for standard SVG files
                             try:
                                 doc = execute(f'read "{file_path}"')
                                 update_svg_preview(window, doc)
                             except Exception as e:
                                 window["-UR10_STATUS-"].print(f"Error loading SVG with vpype: {e}")
                                 update_svg_preview(window, None)
-                        
-                        # Switch to the preview tab
-                        window["-TAB_SVG_PREVIEW-"].select()
+                        window["-TAB_SVG_PREVIEW-"].select() 
                     else:
-                        # Clear the preview if path is invalid
                         update_svg_preview(window, None)
                 
                 # --- Optimize Event ---
@@ -440,40 +323,26 @@ def main():
                     is_hatched = event == "-BTN_OPTIMIZE-HATCHED-"
                     is_dither = event == "-BTN_OPTIMIZE-DITHER-"
 
-                    if is_flow:
-                        doc_to_optimize = flow_document
-                    elif is_hatched:
-                        doc_to_optimize = hatched_document
+                    doc_to_optimize = None
+                    if is_flow: doc_to_optimize = flow_document
+                    elif is_hatched: doc_to_optimize = hatched_document
                     elif is_dither:
                         doc_to_optimize = dither_document
                         if doc_to_optimize:
                             window["-LOG_DITHER-"].print("Converting dither circles to points for optimization...")
                             doc_to_optimize = _convert_dither_circles_to_points(doc_to_optimize)
-                    else:
-                        doc_to_optimize = None # Should not happen
 
+                    log_key = "-LOG_FLOW-"
+                    if is_hatched: log_key = "-LOG_HATCHED-"
+                    elif is_dither: log_key = "-LOG_DITHER-"
+                    
                     if doc_to_optimize is None:
-                        if is_flow:
-                            log_key = "-LOG_FLOW-"
-                        elif is_hatched:
-                            log_key = "-LOG_HATCHED-"
-                        elif is_dither:
-                            log_key = "-LOG_DITHER-"
-                        else:
-                            log_key = "-LOG_FLOW-" # Default
                         window[log_key].print("No drawing to optimize. Generate one first.")
                         continue
                     
-                    if is_flow:
-                        log_key = "-LOG_FLOW-"
-                    elif is_hatched:
-                        log_key = "-LOG_HATCHED-"
-                    elif is_dither:
-                        log_key = "-LOG_DITHER-"
-                    else:
-                        log_key = "-LOG_FLOW-" # Default
                     window[log_key].print("Optimizing drawing... please wait.")
                     
+                    merge_tol, simplify_tol = "0.1", "0.05"
                     if is_flow:
                         merge_tol = values["-OPT_MERGE-"].strip().replace("mm", "").strip()
                         simplify_tol = values["-OPT_SIMPLIFY-"].strip().replace("mm", "").strip()
@@ -483,95 +352,60 @@ def main():
                     elif is_dither:
                         merge_tol = values["-OPT_MERGE-DITHER-"].strip().replace("mm", "").strip()
                         simplify_tol = values["-OPT_SIMPLIFY-DITHER-"].strip().replace("mm", "").strip()
-                    else:
-                        merge_tol = "0.1"
-                        simplify_tol = "0.05"
                     
                     cmd_string = f"linemerge -t {merge_tol}mm linesimplify -t {simplify_tol}mm linesort"
                     
                     print(f"Running command: vpype {cmd_string}")
-                    # This is fast, so no thread is needed
                     optimized_doc = execute(cmd_string, document=doc_to_optimize)
                     
                     if optimized_doc:
+                        window[log_key].print("Optimization complete. Updating preview.")
+                        is_cmyk = False
+                        
                         if is_flow:
                             flow_document = optimized_doc
+                            is_cmyk = values["-FLOW_CMYK-"]
+                            update_preview(window, optimized_doc, is_cmyk, image_key="-PREVIEW_IMAGE_FLOW-")
                         elif is_hatched:
                             hatched_document = optimized_doc
+                            is_cmyk = values["-HATCHED_CMYK-"]
+                            update_preview(window, optimized_doc, is_cmyk, image_key="-PREVIEW_IMAGE_HATCHED-")
                         elif is_dither:
                             dither_document = optimized_doc
-
-                        window[log_key].print("Optimization complete. Updating final preview.")
-                        
-                        is_cmyk = values["-FLOW_CMYK-"] if is_flow else values["-HATCHED_CMYK-"]
-                        if is_dither: # Dither doesn't have CMYK
-                            is_cmyk = False
-                            
-                        # Update the "Final Preview" tab with the optimized drawing
-                        update_preview(window, optimized_doc, is_cmyk=is_cmyk)
-                        window["-TAB_FINAL_PREVIEW-"].select()
+                            update_preview(window, optimized_doc, False, image_key="-PREVIEW_IMAGE_DITHER-")
                     else:
                         window[log_key].print("Optimization failed.")
 
                 # --- Save Event ---
                 elif event in ("-BTN_SAVE-", "-BTN_SAVE-HATCHED-", "-BTN_SAVE-DITHER-"):
                     
-                    is_flow = event == "-BTN_SAVE-"
-                    is_hatched = event == "-BTN_SAVE-HATCHED-"
-                    is_dither = event == "-BTN_SAVE-DITHER-"
-
-                    if is_flow:
-                        doc_to_save = flow_document
-                    elif is_hatched:
+                    doc_to_save, log_key = None, "-LOG_FLOW-"
+                    if event == "-BTN_SAVE-": doc_to_save = flow_document
+                    elif event == "-BTN_SAVE-HATCHED-":
                         doc_to_save = hatched_document
-                    elif is_dither:
+                        log_key = "-LOG_HATCHED-"
+                    elif event == "-BTN_SAVE-DITHER-":
                         doc_to_save = dither_document
+                        log_key = "-LOG_DITHER-"
                         if doc_to_save:
-                            window["-LOG_DITHER-"].print("Converting dither circles to points for saving...")
+                            window[log_key].print("Converting dither circles to points for saving...")
                             doc_to_save = _convert_dither_circles_to_points(doc_to_save)
-                    else:
-                        doc_to_save = None
 
                     if doc_to_save is None:
-                        if is_flow:
-                            log_key = "-LOG_FLOW-"
-                        elif is_hatched:
-                            log_key = "-LOG_HATCHED-"
-                        elif is_dither:
-                            log_key = "-LOG_DITHER-"
-                        else:
-                            log_key = "-LOG_FLOW-" # Default
                         window[log_key].print("Error: No document to save. Generate or optimize first.")
                         continue
 
-                    save_path = sg.popup_get_file(
-                        "Save As",
-                        save_as=True,
-                        no_window=True,
-                        default_extension=".svg",
-                        file_types=(("SVG Files", "*.svg"),)
-                    )
-
-                    if is_flow:
-                        log_key = "-LOG_FLOW-"
-                    elif is_hatched:
-                        log_key = "-LOG_HATCHED-"
-                    elif is_dither:
-                        log_key = "-LOG_DITHER-"
-                    else:
-                        log_key = "-LOG_FLOW-" # Default
+                    save_path = sg.popup_get_file("Save As", save_as=True, no_window=True, default_extension=".svg", file_types=(("SVG", "*.svg"),))
 
                     if save_path:
                         try:
                             window[log_key].print(f"Saving SVG to {save_path}...")
-                            with open(save_path, "w", encoding="utf-8") as f:
-                                vpype.write_svg(f, doc_to_save)
+                            with open(save_path, "w", encoding="utf-8") as f: vpype.write_svg(f, doc_to_save)
                             window[log_key].print("SVG file saved successfully.")
                         except Exception as e:
                             print(f"Error saving file: {e}")
                             sg.popup_error(f"Error saving file: {e}")
-                    else:
-                        window[log_key].print("SVG save cancelled.")
+                    else: window[log_key].print("SVG save cancelled.")
                 
                 # --- UR10 Control Events ---
                 elif event == "-BTN_UR10_CONNECT-":
@@ -607,20 +441,13 @@ def main():
                         current_pose = ur10_controller.get_current_pose()
                         if current_pose:
                             home_pose = current_pose
-                            config = {
-                                "pose": home_pose,
-                                "corner": values["-CANVAS_CORNER-"]
-                            }
-                            with open("home_config.json", "w") as f:
-                                json.dump(config, f)
-                            
+                            config = { "pose": home_pose, "corner": values["-CANVAS_CORNER-"] }
+                            with open("home_config.json", "w") as f: json.dump(config, f)
                             pose_str = ", ".join([f"{x:.3f}" for x in home_pose])
                             window["-HOME_POSE_DISPLAY-"].update(pose_str)
                             window["-UR10_STATUS-"].print(f"Home position set to: {pose_str}")
-                        else:
-                            window["-UR10_STATUS-"].print("Failed to get current position.")
-                    else:
-                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+                        else: window["-UR10_STATUS-"].print("Failed to get current position.")
+                    else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-BTN_START-":
                     if ur10_controller and ur10_controller.is_connected:
@@ -628,32 +455,22 @@ def main():
                         if not svg_file or not os.path.exists(svg_file):
                             window["-UR10_STATUS-"].print("Error: SVG file not found.")
                             continue
-                        
                         if not home_pose:
                             window["-UR10_STATUS-"].print("Error: Home position not set.")
                             continue
-
                         try:
                             canvas_width_mm = float(values["-CANVAS_WIDTH-"])
                             canvas_height_mm = float(values["-CANVAS_HEIGHT-"])
                             dry_run = values["-DRY_RUN-"]
                             corner = values["-CANVAS_CORNER-"]
                             rotation_angle = values["-GLOBAL_ROTATION-"]
-                            
                             speed_control = [values["-PLOT_SPEED-"]]
                             acceleration = values["-PLOT_ACCEL-"]
-
                             window["-UR10_STATUS-"].print(f"Parsing SVG file: {svg_file}")
                             home_x, home_y, home_z, home_rx, home_ry, home_rz = home_pose
-                            
-                            path, width, height = parse_svg(
-                                svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz,
-                                canvas_width_mm, canvas_height_mm, dry_run, corner,
-                                safe_z_offset=SAFE_Z_OFFSET, rotation_angle=rotation_angle
-                            )
+                            path, width, height = parse_svg(svg_file, home_x, home_y, home_z, home_rx, home_ry, home_rz, canvas_width_mm, canvas_height_mm, dry_run, corner, safe_z_offset=SAFE_Z_OFFSET, rotation_angle=rotation_angle)
                             scaled_dims["width"] = width
                             scaled_dims["height"] = height
-                            
                             if path:
                                 window["-BTN_START-"].update(disabled=True)
                                 window["-BTN_PAUSE-"].update(disabled=False)
@@ -661,76 +478,40 @@ def main():
                                 window["-BTN_UR10_HOME-"].update(disabled=True)
                                 window["-BTN_CHECK_CANVAS-"].update(disabled=True)
                                 window["-REALTIME_GRAPH-"].erase()
-
-                                threading.Thread(
-                                    target=ur10_controller.execute_path_realtime,
-                                    args=(path, home_pose, speed_control, acceleration, window, dry_run),
-                                    daemon=True
-                                ).start()
-                            else:
-                                window["-UR10_STATUS-"].print("Error: Could not parse SVG path.")
-
-                        except ValueError:
-                            window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height. Please enter numbers.")
-                        except Exception as e:
-                            window["-UR10_STATUS-"].print(f"An error occurred: {e}")
-                    else:
-                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+                                threading.Thread(target=ur10_controller.execute_path_realtime, args=(path, home_pose, speed_control, acceleration, window, dry_run), daemon=True).start()
+                            else: window["-UR10_STATUS-"].print("Error: Could not parse SVG path.")
+                        except ValueError: window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height. Please enter numbers.")
+                        except Exception as e: window["-UR10_STATUS-"].print(f"An error occurred: {e}")
+                    else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-DRAW_LINE-":
                     start_point, end_point = values[event]
-                    
                     graph_size = window["-REALTIME_GRAPH-"].CanvasSize
-                    width = scaled_dims["width"]
-                    height = scaled_dims["height"]
+                    width, height = scaled_dims["width"], scaled_dims["height"]
                     corner = values["-CANVAS_CORNER-"]
                     home_x, home_y = home_pose[0], home_pose[1]
                     rotation_angle = values["-GLOBAL_ROTATION-"]
-
                     def unrotate_point(p_rotated):
                         angle_rad = math.radians(-(rotation_angle + 45))
-                        cos_a = math.cos(angle_rad)
-                        sin_a = math.sin(angle_rad)
+                        cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
                         x_r, y_r = p_rotated[0], p_rotated[1]
-                        
                         x_unrotated = home_x + (x_r - home_x) * cos_a - (y_r - home_y) * sin_a
                         y_unrotated = home_y + (x_r - home_x) * sin_a + (y_r - home_y) * cos_a
-                        
                         return (x_unrotated, y_unrotated)
-
-                    start_unrotated = unrotate_point(start_point)
-                    end_unrotated = unrotate_point(end_point)
-                    
+                    start_unrotated, end_unrotated = unrotate_point(start_point), unrotate_point(end_point)
                     def transform_coordinates(x, y):
-                        # Determine bounding box based on corner
-                        if corner == "Top Left":
-                            min_x, max_x = home_x, home_x + width
-                            min_y, max_y = home_y - height, home_y
-                        elif corner == "Top Right":
-                            min_x, max_x = home_x - width, home_x
-                            min_y, max_y = home_y - height, home_y
-                        elif corner == "Bottom Left":
-                            min_x, max_x = home_x, home_x + width
-                            min_y, max_y = home_y, home_y + height
-                        elif corner == "Bottom Right":
-                            min_x, max_x = home_x - width, home_x
-                            min_y, max_y = home_y, home_y + height
-                        else: # Default to Top Left
-                            min_x, max_x = home_x, home_x + width
-                            min_y, max_y = home_y - height, home_y
-
-                        # Normalize robot coordinates (0-1)
+                        if corner == "Top Left": min_x, max_x, min_y, max_y = home_x, home_x + width, home_y - height, home_y
+                        elif corner == "Top Right": min_x, max_x, min_y, max_y = home_x - width, home_x, home_y - height, home_y
+                        elif corner == "Bottom Left": min_x, max_x, min_y, max_y = home_x, home_x + width, home_y, home_y + height
+                        elif corner == "Bottom Right": min_x, max_x, min_y, max_y = home_x - width, home_x, home_y, home_y + height
+                        else: min_x, max_x, min_y, max_y = home_x, home_x + width, home_y - height, home_y
                         norm_x = (x - min_x) / (max_x - min_x) if (max_x - min_x) != 0 else 0
                         norm_y = (y - min_y) / (max_y - min_y) if (max_y - min_y) != 0 else 0
-                        
-                        # Scale to graph size
                         graph_x = norm_x * graph_size[0]
-                        graph_y = graph_size[1] - (norm_y * graph_size[1]) # Invert Y-axis
+                        graph_y = graph_size[1] - (norm_y * graph_size[1])
                         return graph_x, graph_y
-                    
                     x1, y1 = transform_coordinates(start_unrotated[0], start_unrotated[1])
                     x2, y2 = transform_coordinates(end_unrotated[0], end_unrotated[1])
-
                     window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
 
                 elif event == "-BTN_PAUSE-":
@@ -761,77 +542,40 @@ def main():
                             acceleration = values["-PLOT_ACCEL-"]
                             ur10_controller.go_home(home_pose, acceleration=acceleration)
                             window["-UR10_STATUS-"].print("Robot is at home.")
-                        else:
-                            window["-UR10_STATUS-"].print("Error: Home position not set.")
-                    else:
-                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+                        else: window["-UR10_STATUS-"].print("Error: Home position not set.")
+                    else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-BTN_CHECK_CANVAS-":
                     if ur10_controller and ur10_controller.is_connected:
                         if not home_pose:
                             window["-UR10_STATUS-"].print("Error: Home position not set.")
                             continue
-                        
                         try:
-                            canvas_width_m = float(values["-CANVAS_WIDTH-"]) / 1000.0
-                            canvas_height_m = float(values["-CANVAS_HEIGHT-"]) / 1000.0
-                            corner = values["-CANVAS_CORNER-"]
-                            acceleration = values["-PLOT_ACCEL-"]
-                            rotation_angle = values["-GLOBAL_ROTATION-"]
-                            
+                            canvas_width_m, canvas_height_m = float(values["-CANVAS_WIDTH-"]) / 1000.0, float(values["-CANVAS_HEIGHT-"]) / 1000.0
+                            corner, acceleration, rotation_angle = values["-CANVAS_CORNER-"], values["-PLOT_ACCEL-"], values["-GLOBAL_ROTATION-"]
                             hx, hy, hz, hrx, hry, hrz = home_pose
                             safe_z = hz + SAFE_Z_OFFSET
-
-                            # 1. Calculate un-rotated corner points
-                            if corner == "Top Left":
-                                tl, tr, bl, br = (hx, hy), (hx + canvas_width_m, hy), (hx, hy - canvas_height_m), (hx + canvas_width_m, hy - canvas_height_m)
-                                sequence = [tl, tr, br, bl, tl]
-                            elif corner == "Top Right":
-                                tr, tl, br, bl = (hx, hy), (hx - canvas_width_m, hy), (hx, hy - canvas_height_m), (hx - canvas_width_m, hy - canvas_height_m)
-                                sequence = [tr, br, bl, tl, tr]
-                            elif corner == "Bottom Left":
-                                bl, tl, br, tr = (hx, hy), (hx, hy + canvas_height_m), (hx + canvas_width_m, hy), (hx + canvas_width_m, hy + canvas_height_m)
-                                sequence = [bl, tl, tr, br, bl]
-                            elif corner == "Bottom Right":
-                                br, bl, tr, tl = (hx, hy), (hx - canvas_width_m, hy), (hx, hy + canvas_height_m), (hx - canvas_width_m, hy + canvas_height_m)
-                                sequence = [br, tr, tl, bl, br]
-                            
-                            # 2. Rotate corner points
+                            if corner == "Top Left": sequence = [(hx, hy), (hx + canvas_width_m, hy), (hx + canvas_width_m, hy - canvas_height_m), (hx, hy - canvas_height_m), (hx, hy)]
+                            elif corner == "Top Right": sequence = [(hx, hy), (hx, hy - canvas_height_m), (hx - canvas_width_m, hy - canvas_height_m), (hx - canvas_width_m, hy), (hx, hy)]
+                            elif corner == "Bottom Left": sequence = [(hx, hy), (hx, hy + canvas_height_m), (hx + canvas_width_m, hy + canvas_height_m), (hx + canvas_width_m, hy), (hx, hy)]
+                            elif corner == "Bottom Right": sequence = [(hx, hy), (hx - canvas_width_m, hy), (hx - canvas_width_m, hy + canvas_height_m), (hx, hy + canvas_height_m), (hx, hy)]
                             angle_rad = math.radians(rotation_angle + 45)
-                            cos_a = math.cos(angle_rad)
-                            sin_a = math.sin(angle_rad)
-                            
+                            cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
                             def rotate_point(p):
                                 px, py = p[0], p[1]
                                 x_rot = hx + (px - hx) * cos_a - (py - hy) * sin_a
                                 y_rot = hy + (px - hx) * sin_a + (py - hy) * cos_a
                                 return (x_rot, y_rot)
-
                             corners_rotated = [rotate_point(p) for p in sequence]
-                            
-                            # 3. Create list of poses
                             corner_poses = [(p[0], p[1], safe_z, hrx, hry, hrz) for p in corners_rotated]
-                            
-                            # 4. Execute in a thread
                             window["-UR10_STATUS-"].print("Moving robot to check canvas corners...")
-                            threading.Thread(
-                                target=ur10_controller.execute_move_sequence,
-                                args=(corner_poses, values["-PLOT_SPEED-"], acceleration),
-                                daemon=True
-                            ).start()
-
-                        except ValueError:
-                            window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height.")
-                        except Exception as e:
-                            window["-UR10_STATUS-"].print(f"An error occurred: {e}")
-                    else:
-                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+                            threading.Thread(target=ur10_controller.execute_move_sequence, args=(corner_poses, values["-PLOT_SPEED-"], acceleration), daemon=True).start()
+                        except ValueError: window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height.")
+                        except Exception as e: window["-UR10_STATUS-"].print(f"An error occurred: {e}")
+                    else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 if 'speed_control' in locals():
                     speed_control[0] = values["-PLOT_SPEED-"]
-
-
-
             except Exception as e:
                 print("\nAn unexpected error occurred:")
                 import traceback

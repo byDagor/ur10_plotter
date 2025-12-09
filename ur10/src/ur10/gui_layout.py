@@ -2,39 +2,31 @@ import FreeSimpleGUI as sg
 
 def create_layout():
     """
-    Creates the main GUI layout.
+    Creates the main GUI layout with a flexible, expanding preview structure.
     """
-    
     sg.theme("DarkGrey2")
     
+    # --- Shared settings ---
+    CONTROLS_SIZE = (480, 500)
+    PREVIEW_SIZE = (600, 600)
+
     # --- Tab 1: Flow Imager ---
     flow_controls = [
         [sg.Text("Vectorize an image using 'flow_imager'.", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_FLOW-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_FLOW-")],
-        
         [sg.Text("Noise Coeff:", s=(15, 1)), sg.Input("0.0005", key="-FLOW_NOISE-", s=(10, 1))],
         [sg.Text("Min Separation:", s=(15, 1)), sg.Slider(range=(0.5, 10), default_value=0.8, resolution=0.1, orientation="h", key="-FLOW_MIN_SEP-", s=(30, 20))],
         [sg.Text("Max Separation:", s=(15, 1)), sg.Slider(range=(1, 20), default_value=10.0, resolution=0.1, orientation="h", key="-FLOW_MAX_SEP-", s=(30, 20))],
-        
         [sg.Text("Min Length (mm):", s=(15, 1)), sg.Input("0", key="-FLOW_MIN_LEN-", s=(10, 1))],
         [sg.Text("Max Length (mm):", s=(15, 1)), sg.Input("1000", key="-FLOW_MAX_LEN-", s=(10, 1))],
         [sg.Text("Max Size (px):", s=(15, 1)), sg.Input("1600", key="-FLOW_MAX_SIZE-", s=(10, 1))],
-        
         [sg.Text("N Fields:", s=(15, 1)), sg.Slider(range=(1, 10), default_value=1, resolution=1, orientation="h", key="-FLOW_N_FIELDS-", s=(30, 20))],
         [sg.Text("Edge Flow:", s=(15, 1)), sg.Slider(range=(0.0, 10.0), default_value=1.0, resolution=0.1, orientation="h", key="-FLOW_EDGE-", s=(30, 20))],
         [sg.Text("Dark Flow:", s=(15, 1)), sg.Slider(range=(0.0, 10.0), default_value=1.0, resolution=0.1, orientation="h", key="-FLOW_DARK-", s=(30, 20))],
         [sg.Text("Rotate:", s=(15, 1)), sg.Slider(range=(0, 360), default_value=0, resolution=1, orientation="h", key="-FLOW_ROTATE-", s=(30, 20))],
-        
-        [
-            sg.Checkbox("Use CMYK Layers", key="-FLOW_CMYK-", default=False),
-            sg.Checkbox("K-d Tree (`-kdt`)", key="-FLOW_KDT-", default=False),
-            sg.Checkbox("Trim Border (`-tm`)", key="-FLOW_TRIM-", default=False),
-        ],
-        [
-            sg.Button("Vectorize with Flow Imager", key="-BTN_VECTORIZE_FLOW-", expand_x=True, font="Helvetica 10 bold"),
-            sg.Button("Stop", key="-BTN_STOP_FLOW-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
-        ],
+        [sg.Checkbox("Use CMYK Layers", key="-FLOW_CMYK-", default=False), sg.Checkbox("K-d Tree (`-kdt`)", key="-FLOW_KDT-", default=False), sg.Checkbox("Trim Border (`-tm`)", key="-FLOW_TRIM-", default=False)],
+        [sg.Button("Vectorize with Flow Imager", key="-BTN_VECTORIZE_FLOW-", expand_x=True, font="Helvetica 10 bold"), sg.Button("Stop", key="-BTN_STOP_FLOW-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
         [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-", s=(10, 1))],
@@ -46,43 +38,28 @@ def create_layout():
         [sg.Text("Status:")],
         [sg.Multiline(key="-LOG_FLOW-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
     ]
-    # Make the Flow tab scrollable
-    flow_controls_col = [[sg.Column(flow_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
-
+    flow_tab_layout = [[
+        sg.Column(flow_controls, scrollable=True, vertical_scroll_only=True, size=CONTROLS_SIZE, pad=(0,0)),
+        sg.VSeparator(),
+        sg.Column([[sg.Image(key="-PREVIEW_IMAGE_FLOW-", background_color="white", expand_x=True, expand_y=True)]], expand_x=True, expand_y=True, pad=(0,0))
+    ]]
 
     # --- Tab 2: Hatched ---
     hatched_controls = [
         [sg.Text("Vectorize an image using local 'hatched.py'.", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_HATCHED-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_HATCHED-")],
-        
         [sg.Text("Image Scale:", s=(15, 1)), sg.Slider(range=(0.1, 1.0), default_value=0.5, resolution=0.05, orientation="h", key="-HATCHED_SCALE-", s=(30, 20))],
-        
         [sg.Text("Hatch Offset (px):", s=(15, 1)), sg.Input("0.0", key="-HATCHED_OFFSET-", s=(10, 1))],
         [sg.Text("Gaussian Blur (px):", s=(15, 1)), sg.Slider(range=(0.0, 20.0), default_value=1.0, resolution=0.1, orientation="h", key="-HATCHED_BLUR-", s=(30, 20))],
         [sg.Text("Hatch Pitch (px):", s=(15, 1)), sg.Slider(range=(1.0, 20.0), default_value=5.0, resolution=0.1, orientation="h", key="-HATCHED_PITCH-", s=(30, 20))],
-        
         [sg.Text("Hatch Angles:", s=(15, 1)), sg.Input("45", key="-HATCHED_ANGLES-", s=(20, 1)), sg.Text("Space-separated")],
         [sg.Text("Levels:", s=(15, 1)), sg.Input("64 128 192", key="-HATCHED_LEVELS-", s=(20, 1)), sg.Text("Space-separated (0-255)")],
-        
         [sg.Text("Interpolation:", s=(15, 1)), sg.DropDown(["INTER_LINEAR", "INTER_NEAREST"], default_value="INTER_LINEAR", key="-HATCHED_INTERP-", s=(20, 1))],
-        
         [sg.Text("Circular Center:", s=(15, 1)), sg.Input("0.5 0.5", key="-HATCHED_CENTER-", s=(10, 1))],
-        
-        [
-            sg.Checkbox("Use CMYK Layers", key="-HATCHED_CMYK-", default=False),
-            sg.Checkbox("Invert", key="-HATCHED_INVERT-", default=False),
-            sg.Checkbox("Circular Hatch", key="-HATCHED_CIRCULAR-", default=False),
-            sg.Checkbox("H-Mirror", key="-HATCHED_HMIRROR-", default=False),
-        ],
-        [
-            sg.Checkbox("Draw Contours", key="-HATCHED_LINES-", default=True),
-            sg.Checkbox("Draw Hatch Fill", key="-HATCHED_HATCH-", default=True),
-        ],
-        [
-            sg.Button("Vectorize with Hatched", key="-BTN_VECTORIZE_HATCHED-", expand_x=True, font="Helvetica 10 bold"),
-            sg.Button("Stop", key="-BTN_STOP_HATCHED-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
-        ],
+        [sg.Checkbox("Use CMYK Layers", key="-HATCHED_CMYK-", default=False), sg.Checkbox("Invert", key="-HATCHED_INVERT-", default=False), sg.Checkbox("Circular Hatch", key="-HATCHED_CIRCULAR-", default=False), sg.Checkbox("H-Mirror", key="-HATCHED_HMIRROR-", default=False)],
+        [sg.Checkbox("Draw Contours", key="-HATCHED_LINES-", default=True), sg.Checkbox("Draw Hatch Fill", key="-HATCHED_HATCH-", default=True)],
+        [sg.Button("Vectorize with Hatched", key="-BTN_VECTORIZE_HATCHED-", expand_x=True, font="Helvetica 10 bold"), sg.Button("Stop", key="-BTN_STOP_HATCHED-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
         [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-HATCHED-", s=(10, 1))],
@@ -94,40 +71,25 @@ def create_layout():
         [sg.Text("Status:")],
         [sg.Multiline(key="-LOG_HATCHED-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
     ]
-    # Make the Hatched tab scrollable
-    hatched_controls_col = [[sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
+    hatched_tab_layout = [[
+        sg.Column(hatched_controls, scrollable=True, vertical_scroll_only=True, size=CONTROLS_SIZE, pad=(0,0)),
+        sg.VSeparator(),
+        sg.Column([[sg.Image(key="-PREVIEW_IMAGE_HATCHED-", background_color="white", expand_x=True, expand_y=True)]], expand_x=True, expand_y=True, pad=(0,0))
+    ]]
 
-    # --- Tab for Dither ---
+    # --- Tab 3: Dither ---
     dither_controls = [
         [sg.Text("Vectorize an image using dithering.", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
-        
-        # Add the physical dimension controls back
         [sg.Text("Pen Diameter (mm):", s=(15, 1)), sg.Input("0.35", key="-DITHER_PEN_DIAMETER-", s=(10, 1))],
         [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-DITHER_CANVAS_WIDTH-", s=(10, 1))],
         [sg.Text("Canvas Height (mm):", s=(15, 1)), sg.Input("210", key="-DITHER_CANVAS_HEIGHT-", s=(10, 1))],
-
         [sg.Text("Detail (Horizontal Dots):", s=(15, 1)), sg.Slider(range=(50, 500), default_value=150, resolution=1, orientation="h", key="-DITHER_H_DOTS-", s=(30, 20))],
-        
         [sg.Text("Dithering Method:", s=(15,1)), sg.DropDown(["Floyd-Steinberg", "Ordered (Halftone)", "Stochastic (Random)"], default_value="Floyd-Steinberg", key="-DITHER_METHOD-", s=(30,1), enable_events=True)],
-        
-        # Column for Contrast slider (for Floyd-Steinberg)
-        [sg.Column([[
-            sg.Text("Contrast:", s=(15, 1)), 
-            sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))
-        ]], key='-COL_CONTRAST-')],
-
-        # Column for Density slider (for Ordered and Stochastic)
-        [sg.Column([[
-            sg.Text("Density:", s=(15, 1)), 
-            sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))
-        ]], key='-COL_DENSITY-', visible=False)],
-        
-        [
-            sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"),
-            sg.Button("Stop", key="-BTN_STOP_DITHER-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)
-        ],
+        [sg.Column([[sg.Text("Contrast:", s=(15, 1)), sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))]], key='-COL_CONTRAST-')],
+        [sg.Column([[sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))]], key='-COL_DENSITY-', visible=False)],
+        [sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"), sg.Button("Stop", key="-BTN_STOP_DITHER-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
         [sg.Text("Merge Tol. (mm):", s=(15, 1)), sg.Input("0.1", key="-OPT_MERGE-DITHER-", s=(10, 1))],
@@ -139,12 +101,59 @@ def create_layout():
         [sg.Text("Status:")],
         [sg.Multiline(key="-LOG_DITHER-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
     ]
-    dither_controls_col = [[sg.Column(dither_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
+    dither_tab_layout = [[
+        sg.Column(dither_controls, scrollable=True, vertical_scroll_only=True, size=CONTROLS_SIZE, pad=(0,0)),
+        sg.VSeparator(),
+        sg.Column([[sg.Image(key="-PREVIEW_IMAGE_DITHER-", background_color="white", expand_x=True, expand_y=True)]], expand_x=True, expand_y=True, pad=(0,0))
+    ]]
 
+    # --- Tab 4: UR10 Control ---
+    ur10_controls = [
+        [sg.Text("UR10 Robot Control", font="Helvetica 12")],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Robot IP:", s=(15, 1)), sg.Input("10.0.10.208", key="-UR10_IP-", s=(20, 1))],
+        [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
+        [sg.HorizontalSeparator()],
+        [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1), enable_events=True), sg.FileBrowse(target="-SVG_PATH-")],
+        [sg.Checkbox("Render SVG as dots (for dithered files)", key="-RENDER_AS_DOTS-", default=False)],
+        [sg.Text("Home Position:", s=(15,1)), sg.Input("Not Set", key="-HOME_POSE_DISPLAY-", s=(30,1), disabled=True)],
+        [sg.Button("Set Home to Current Position", key="-BTN_SET_HOME-", expand_x=True, disabled=True)],
+        [sg.Text("Canvas Corner:", s=(15,1)), sg.DropDown(["Top Left", "Top Right", "Bottom Left", "Bottom Right"], default_value="Top Left", key="-CANVAS_CORNER-", s=(20,1), readonly=True)],
+        [sg.Text("Global Rotation:", s=(15,1)), sg.DropDown([0, -90, 90, 180], default_value=90, key="-GLOBAL_ROTATION-", s=(20,1), readonly=True)],
+        [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-CANVAS_WIDTH-", s=(10, 1)), sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))],
+        [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.01, 1.0), default_value=0.10, resolution=0.01, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
+        [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.05, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
+        [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
+        [sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")), sg.Button("Pause", key="-BTN_PAUSE-", expand_x=True, disabled=True, button_color=("white", "orange")), sg.Button("Stop", key="-BTN_STOP-", expand_x=True, disabled=True, button_color=("white", "red"))],
+        [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
+        [sg.Button("Check Canvas", key="-BTN_CHECK_CANVAS-", expand_x=True, disabled=True)],
+        [sg.HorizontalSeparator()],
+        [sg.Text("Status:")],
+        [sg.Multiline(key="-UR10_STATUS-", size=(50, 5), autoscroll=True, disabled=True)],
+    ]
     
-    # --- Tab 3: Instructions (with text wrapping and units) ---
-    LBL_W = 20 # Width of the label column
-    DESC_W = 38 # Width of the description column (with wrapping)
+    ur10_preview_tabs = sg.TabGroup([[
+        sg.Tab("SVG Preview", [[sg.Image(key="-SVG_PREVIEW_IMAGE-", background_color="white", expand_x=True, expand_y=True)]], key="-TAB_SVG_PREVIEW-", expand_x=True, expand_y=True),
+        sg.Tab("Real-time Drawing", [[sg.Graph(
+            canvas_size=PREVIEW_SIZE, 
+            graph_bottom_left=(0, PREVIEW_SIZE[1]), 
+            graph_top_right=(PREVIEW_SIZE[0], 0), 
+            key="-REALTIME_GRAPH-", 
+            background_color="white", 
+            expand_x=True, 
+            expand_y=True
+        )]], key="-TAB_REALTIME_DRAWING-", expand_x=True, expand_y=True)
+    ]], expand_x=True, expand_y=True)
+
+    ur10_tab_layout = [[
+        sg.Column(ur10_controls, scrollable=True, vertical_scroll_only=True, size=CONTROLS_SIZE, pad=(0,0)),
+        sg.VSeparator(),
+        sg.Column([[ur10_preview_tabs]], expand_x=True, expand_y=True, pad=(0,0))
+    ]]
+    
+    # --- Instructions Tab ---
+    LBL_W = 25 # Width of the label column
+    DESC_W = 100 # Width of the description column (with wrapping)
     
     instructions_layout = [
         [sg.Text("Parameter Explanations", font="Helvetica 14 bold")],
@@ -201,123 +210,19 @@ def create_layout():
         [sg.Text("Stop:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Stops the plotting process and returns the robot to its home position.", size=(DESC_W, None))],
         [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the safe home position (20mm above the canvas).", size=(DESC_W, None))],
     ]
+    instructions_tab = [[sg.Column(instructions_layout, scrollable=True, vertical_scroll_only=True, size=(1080, 600), pad=(0,0))]]
 
-    # Create a scrollable column for the instructions
-    instructions_tab = [[sg.Column(instructions_layout, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
-
-
-    # --- Tab 3: UR10 Control ---
-    ur10_controls = [
-        [sg.Text("UR10 Robot Control", font="Helvetica 12")],
-        [sg.HorizontalSeparator()],
-        [sg.Text("Robot IP:", s=(15, 1)), sg.Input("10.0.10.208", key="-UR10_IP-", s=(20, 1))],
-        [sg.Button("Connect to UR10", key="-BTN_UR10_CONNECT-", expand_x=True)],
-        [sg.HorizontalSeparator()],
-        [sg.Text("SVG File:", s=(15, 1)), sg.Input(key="-SVG_PATH-", s=(30, 1), enable_events=True), sg.FileBrowse(target="-SVG_PATH-")],
-        [sg.Checkbox("Render SVG as dots (for dithered files)", key="-RENDER_AS_DOTS-", default=False)],
-        [sg.Text("Home Position:", s=(15,1)), sg.Input("Not Set", key="-HOME_POSE_DISPLAY-", s=(30,1), disabled=True)],
-        [
-            sg.Button("Set Home to Current Position", key="-BTN_SET_HOME-", expand_x=True, disabled=True),
-        ],
-        [
-            sg.Text("Canvas Corner:", s=(15,1)), 
-            sg.DropDown(
-                ["Top Left", "Top Right", "Bottom Left", "Bottom Right"], 
-                default_value="Top Left", 
-                key="-CANVAS_CORNER-", 
-                s=(20,1),
-                readonly=True
-            )
-        ],
-        [
-            sg.Text("Global Rotation:", s=(15,1)),
-            sg.DropDown(
-                [0, -90, 90, 180],
-                default_value=90,
-                key="-GLOBAL_ROTATION-",
-                s=(20,1),
-                readonly=True
-            )
-        ],
-        [
-            sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-CANVAS_WIDTH-", s=(10, 1)),
-            sg.Text("Height (mm):", s=(10, 1)), sg.Input("210", key="-CANVAS_HEIGHT-", s=(10, 1))
-        ],
-        [sg.Text("Plotting Speed (m/s):", s=(15, 1)), sg.Slider(range=(0.01, 1.0), default_value=0.10, resolution=0.01, orientation="h", key="-PLOT_SPEED-", s=(30, 20))],
-        [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.05, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
-        [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
-        [
-            sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")),
-            sg.Button("Pause", key="-BTN_PAUSE-", expand_x=True, disabled=True, button_color=("white", "orange")),
-            sg.Button("Stop", key="-BTN_STOP-", expand_x=True, disabled=True, button_color=("white", "red")),
-        ],
-        [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
-        [sg.Button("Check Canvas", key="-BTN_CHECK_CANVAS-", expand_x=True, disabled=True)],
-        [sg.HorizontalSeparator()],
-        [sg.Text("Status:")],
-        [sg.Multiline(key="-UR10_STATUS-", size=(50, 5), autoscroll=True, disabled=True)],
-    ]
-    ur10_controls_col = [[sg.Column(ur10_controls, scrollable=True, vertical_scroll_only=True, size=(500, 600), pad=(0,0))]]
-
-
-    # --- Main Controls Column ---
-    controls_column = [
-        [sg.Text("PLOTTUR10 GUI", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
-        
-        [sg.TabGroup([
-            [
-                sg.Tab("Flow Imager", flow_controls_col, key="-TAB_FLOW-"),
-                sg.Tab("Hatched", hatched_controls_col, key="-TAB_HATCHED-"),
-                sg.Tab("Dither", dither_controls_col, key="-TAB_DITHER-"), # New Dither Tab
-                sg.Tab("UR10 Control", ur10_controls_col, key="-TAB_UR10-"),
-                sg.Tab("Instructions", instructions_tab, key="-TAB_INSTRUCTIONS-")
-            ]
-        ], key="-TABGROUP-", expand_x=True, expand_y=True)],
-    ]
-
-    visual_column = [
-        [sg.Text("Preview", font="Helvetica 18 bold", pad=((0,0), (0, 10)))],
-        [sg.TabGroup([
-            [
-                sg.Tab("Flow Preview", [[sg.Image(key="-FLOW_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_FLOW_PREVIEW-"),
-                sg.Tab("Hatched Preview", [[sg.Image(key="-HATCHED_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_HATCHED_PREVIEW-"),
-                sg.Tab("Dither Preview", [[sg.Image(key="-DITHER_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]], key="-TAB_DITHER_PREVIEW-"), # New Dither Preview Tab
-                sg.Tab("Final Preview", [
-                    [sg.Graph(
-                        canvas_size=(600, 600),
-                        graph_bottom_left=(0, 600),
-                        graph_top_right=(600, 0),
-                        key="-GRAPH-",
-                        background_color="white",
-                        enable_events=True,
-                        expand_x=True, expand_y=True
-                    )],
-                    [sg.Image(key="-VISUAL-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]
-                ], key="-TAB_FINAL_PREVIEW-"),
-                sg.Tab("SVG Preview", [
-                    [sg.Image(key="-SVG_PREVIEW_IMAGE-", size=(600, 600), background_color="white", expand_x=True, expand_y=True)]
-                ], key="-TAB_SVG_PREVIEW-"),
-                sg.Tab("Real-time Drawing", [
-                    [sg.Graph(
-                        canvas_size=(600, 600),
-                        graph_bottom_left=(0, 600),
-                        graph_top_right=(600, 0),
-                        key="-REALTIME_GRAPH-",
-                        background_color="white",
-                        enable_events=True,
-                        expand_x=True, expand_y=True
-                    )]
-                ], key="-TAB_REALTIME_DRAWING-")
-            ]
-        ], key="-PREVIEW_TABGROUP-", expand_x=True, expand_y=True)],
-    ]
-    
-    layout = [
-        [
-            sg.Column(controls_column, vertical_alignment="top", expand_y=True),
-            sg.VSeparator(),
-            sg.Column(visual_column, vertical_alignment="top", element_justification="center", expand_y=True)
-        ]
-    ]
+    # --- Main Layout ---
+    layout = [[
+        sg.Text("PLOTTUR10 GUI", font="Helvetica 18 bold", pad=((0,0), (0, 10)))
+    ], [
+        sg.TabGroup([[
+            sg.Tab("Flow Imager", flow_tab_layout, key="-TAB_FLOW-"),
+            sg.Tab("Hatched", hatched_tab_layout, key="-TAB_HATCHED-"),
+            sg.Tab("Dither", dither_tab_layout, key="-TAB_DITHER-"),
+            sg.Tab("UR10 Control", ur10_tab_layout, key="-TAB_UR10-"),
+            sg.Tab("Instructions", instructions_tab, key="-TAB_INSTRUCTIONS-")
+        ]], key="-TABGROUP-", expand_x=True, expand_y=True)
+    ]]
     
     return layout
