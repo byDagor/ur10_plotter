@@ -51,6 +51,7 @@ def main():
     flow_document: Union[vpype.Document, None] = None
     hatched_document: Union[vpype.Document, None] = None
     dither_document: Union[vpype.Document, None] = None
+    dither_is_cmyk = False
 
     ur10_controller: Union[UR10Controller, None] = None
     scaled_dims = {"width": 0, "height": 0}
@@ -189,26 +190,51 @@ def main():
                     if not img_path or not os.path.exists(img_path):
                         print(f"Error: Image file not found or not specified: {img_path}")
                         continue
-                    params = {}
-                    params["img_path"] = img_path
-                    params["method"] = values["-DITHER_METHOD-"]
+                    
+                    params = {"img_path": img_path}
+                    params["cmyk_dither"] = values["-DITHER_CMYK-"]
+                    
                     try:
                         params["pen_diameter_mm"] = float(values["-DITHER_PEN_DIAMETER-"].strip())
-                        params["canvas_width_mm"] = float(values["-DITHER_CANVAS_WIDTH-"].strip())
-                        params["canvas_height_mm"] = float(values["-DITHER_CANVAS_HEIGHT-"].strip())
                         params["h_dots"] = int(values["-DITHER_H_DOTS-"])
-                        params["density"] = values["-DITHER_DENSITY-"]
-                        if values["-DITHER_METHOD-"] == "Floyd-Steinberg": params["contrast_factor"] = values["-DITHER_CONTRAST-"]
-                        else: params["contrast_factor"] = 1.0
                         params["dot_radius_mm"] = params["pen_diameter_mm"] / 2.0
+
+                        if params["cmyk_dither"]:
+                            params["method"] = "Floyd-Steinberg" 
+                            params["contrast_factor"] = values["-DITHER_CONTRAST-"]
+                            params["cmyk_channels"] = {
+                                'c': values["-DITHER_CMYK_C-"],
+                                'm': values["-DITHER_CMYK_M-"],
+                                'y': values["-DITHER_CMYK_Y-"],
+                                'k': values["-DITHER_CMYK_K-"]
+                            }
+                            params["pixel_offset"] = int(values["-DITHER_PIXEL_OFFSET-"])
+                        else:
+                            params["method"] = values["-DITHER_METHOD-"]
+                            params["density"] = values["-DITHER_DENSITY-"]
+                            if values["-DITHER_METHOD-"] == "Floyd-Steinberg":
+                                params["contrast_factor"] = values["-DITHER_CONTRAST-"]
+                            else:
+                                params["contrast_factor"] = 1.0
+
                     except (ValueError, ZeroDivisionError) as e:
                         print(f"Error: Invalid numeric input. Please check your values. ({e})")
                         continue
+
                     window["-LOG_DITHER-"].print("Starting Dither vectorization... please wait.")
                     stop_dither_event.clear()
                     window["-BTN_VECTORIZE_DITHER-"].update(disabled=True)
                     window["-BTN_STOP_DITHER-"].update(disabled=False)
                     threading.Thread(target=run_dither_thread, args=(window, params, stop_dither_event), daemon=True).start()
+
+                elif event == "-DITHER_CMYK-":
+                    is_cmyk = values[event]
+                    window['-COL_DITHER_CMYK-'].update(visible=is_cmyk)
+                    window['-DITHER_METHOD-'].update(disabled=is_cmyk)
+                    window['-COL_DENSITY-'].update(visible=not is_cmyk and values['-DITHER_METHOD-'] != "Floyd-Steinberg")
+                    # Contrast is used for both, so keep it visible but maybe change label?
+                    window['-COL_CONTRAST-'].update(visible=is_cmyk or values['-DITHER_METHOD-'] == "Floyd-Steinberg")
+
 
                 elif event == "-DITHER_METHOD-":
                     if values[event] == "Floyd-Steinberg":
@@ -246,7 +272,7 @@ def main():
                         window["-BTN_VECTORIZE_DITHER-"].update(disabled=False)
                         window["-BTN_STOP_DITHER-"].update(disabled=True)
                     
-                    if message not in ("Flow Imager vectorization complete.", "Hatched vectorization complete.", "Dither vectorization complete."):
+                    if "vectorization complete." not in message:
                         print(f"Thread Error: {message}")
                         sg.popup_error(f"Vectorization Failed:\n\n{message}")
                     elif doc_from_thread:
@@ -263,7 +289,8 @@ def main():
                             update_hatched_preview(window, hatched_document, is_cmyk)
                         elif "Dither" in message:
                             dither_document = doc_from_thread
-                            update_dither_preview(window, dither_document)
+                            dither_is_cmyk = is_cmyk
+                            update_dither_preview(window, dither_document, is_cmyk)
                     else:
                         log_key = "-LOG_FLOW-"
                         if "Hatched" in message: log_key = "-LOG_HATCHED-"
@@ -272,11 +299,13 @@ def main():
 
                         if "Flow Imager" in message: flow_document = None
                         elif "Hatched" in message: hatched_document = None
-                        elif "Dither" in message: dither_document = None
+                        elif "Dither" in message:
+                            dither_document = None
+                            dither_is_cmyk = False
                         
                         update_flow_preview(window, None, is_cmyk=False)
                         update_hatched_preview(window, None, is_cmyk=False)
-                        update_dither_preview(window, None)
+                        update_dither_preview(window, None, is_cmyk=False)
                 
                 # --- Vectorizer Stop Events ---
                 elif event == "-BTN_STOP_FLOW-":
@@ -328,9 +357,13 @@ def main():
                     elif is_hatched: doc_to_optimize = hatched_document
                     elif is_dither:
                         doc_to_optimize = dither_document
-                        if doc_to_optimize:
+                        if doc_to_optimize and not dither_is_cmyk:
                             window["-LOG_DITHER-"].print("Converting dither circles to points for optimization...")
                             doc_to_optimize = _convert_dither_circles_to_points(doc_to_optimize)
+                        elif dither_is_cmyk:
+                             window["-LOG_DITHER-"].print("Optimization of CMYK dither is not recommended. Save files individually.")
+                             continue
+
 
                     log_key = "-LOG_FLOW-"
                     if is_hatched: log_key = "-LOG_HATCHED-"
@@ -360,18 +393,20 @@ def main():
                     
                     if optimized_doc:
                         window[log_key].print("Optimization complete. Updating preview.")
-                        is_cmyk = False
+                        is_cmyk_preview = False
                         
                         if is_flow:
                             flow_document = optimized_doc
-                            is_cmyk = values["-FLOW_CMYK-"]
-                            update_preview(window, optimized_doc, is_cmyk, image_key="-PREVIEW_IMAGE_FLOW-")
+                            is_cmyk_preview = values["-FLOW_CMYK-"]
+                            update_preview(window, optimized_doc, is_cmyk_preview, image_key="-PREVIEW_IMAGE_FLOW-")
                         elif is_hatched:
                             hatched_document = optimized_doc
-                            is_cmyk = values["-HATCHED_CMYK-"]
-                            update_preview(window, optimized_doc, is_cmyk, image_key="-PREVIEW_IMAGE_HATCHED-")
+                            is_cmyk_preview = values["-HATCHED_CMYK-"]
+                            update_preview(window, optimized_doc, is_cmyk_preview, image_key="-PREVIEW_IMAGE_HATCHED-")
                         elif is_dither:
                             dither_document = optimized_doc
+                            # After optimization, it's no longer CMYK in the same way
+                            dither_is_cmyk = False 
                             update_preview(window, optimized_doc, False, image_key="-PREVIEW_IMAGE_DITHER-")
                     else:
                         window[log_key].print("Optimization failed.")
@@ -387,20 +422,71 @@ def main():
                     elif event == "-BTN_SAVE-DITHER-":
                         doc_to_save = dither_document
                         log_key = "-LOG_DITHER-"
-                        if doc_to_save:
-                            window[log_key].print("Converting dither circles to points for saving...")
-                            doc_to_save = _convert_dither_circles_to_points(doc_to_save)
 
                     if doc_to_save is None:
                         window[log_key].print("Error: No document to save. Generate or optimize first.")
                         continue
+                    
+                    # Special handling for CMYK Dither save
+                    if event == "-BTN_SAVE-DITHER-" and dither_is_cmyk:
+                        save_path = sg.popup_get_file("Save As (Base Filename)", save_as=True, no_window=True, default_extension=".svg", file_types=(("SVG", "*.svg"),))
+                        if not save_path:
+                            window[log_key].print("SVG save cancelled.")
+                            continue
+
+                        base_dir = os.path.dirname(save_path)
+                        base_name = os.path.splitext(os.path.basename(save_path))[0]
+                        channel_map = {1: '_C', 2: '_M', 3: '_Y', 4: '_K'}
+                        files_saved = []
+
+                        try:
+                            full_bounds = doc_to_save.bounds()
+                            if not full_bounds:
+                                sg.popup_error("Cannot save, document has no bounds.")
+                                continue
+
+                            min_x, min_y, max_x, max_y = full_bounds
+                            corner_lines = vpype.LineCollection([
+                                vpype.line(min_x, min_y, min_x, min_y),
+                                vpype.line(max_x, max_y, max_x, max_y)
+                            ])
+
+                            for layer_id, suffix in channel_map.items():
+                                if layer_id in doc_to_save.layers:
+                                    layer_doc = vpype.Document()
+                                    # Add the actual geometry for the layer
+                                    layer_doc.add(vpype.LineCollection(doc_to_save.layers[layer_id]))
+                                    # Add the corner points to enforce the bounding box
+                                    layer_doc.add(corner_lines)
+                                    
+                                    window[log_key].print(f"Converting layer {suffix} circles to points...")
+                                    layer_doc_points = _convert_dither_circles_to_points(layer_doc)
+
+                                    file_name = os.path.join(base_dir, f"{base_name}{suffix}.svg")
+                                    window[log_key].print(f"Saving {file_name}...")
+                                    with open(file_name, "w", encoding="utf-8") as f:
+                                        vpype.write_svg(f, layer_doc_points)
+                                    files_saved.append(file_name)
+                            
+                            sg.popup("CMYK Dither Save Complete", f"Saved {len(files_saved)} files:\n" + "\n".join(files_saved))
+
+                        except Exception as e:
+                            print(f"Error saving CMYK dither files: {e}")
+                            sg.popup_error(f"Error saving CMYK dither files: {e}")
+                        continue
+
+
+                    # Standard save for all other cases
+                    if event == "-BTN_SAVE-DITHER-" and doc_to_save:
+                        window[log_key].print("Converting dither circles to points for saving...")
+                        doc_to_save = _convert_dither_circles_to_points(doc_to_save)
 
                     save_path = sg.popup_get_file("Save As", save_as=True, no_window=True, default_extension=".svg", file_types=(("SVG", "*.svg"),))
 
                     if save_path:
                         try:
                             window[log_key].print(f"Saving SVG to {save_path}...")
-                            with open(save_path, "w", encoding="utf-8") as f: vpype.write_svg(f, doc_to_save)
+                            vpype.write(save_path, doc_to_save)
                             window[log_key].print("SVG file saved successfully.")
                         except Exception as e:
                             print(f"Error saving file: {e}")
@@ -542,7 +628,7 @@ def main():
                             acceleration = values["-PLOT_ACCEL-"]
                             ur10_controller.go_home(home_pose, acceleration=acceleration)
                             window["-UR10_STATUS-"].print("Robot is at home.")
-                        else: window["-UR10_STATUS-"].print("Error: Home position not set.")
+                        else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
                     else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-BTN_CHECK_CANVAS-":

@@ -7,7 +7,7 @@ def create_layout():
     sg.theme("DarkGrey2")
     
     # --- Shared settings ---
-    CONTROLS_SIZE = (480, 500)
+    CONTROLS_SIZE = (480, 600)
     PREVIEW_SIZE = (600, 600)
 
     # --- Tab 1: Flow Imager ---
@@ -89,6 +89,18 @@ def create_layout():
         [sg.Text("Dithering Method:", s=(15,1)), sg.DropDown(["Floyd-Steinberg", "Ordered (Halftone)", "Stochastic (Random)"], default_value="Floyd-Steinberg", key="-DITHER_METHOD-", s=(30,1), enable_events=True)],
         [sg.Column([[sg.Text("Contrast:", s=(15, 1)), sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))]], key='-COL_CONTRAST-')],
         [sg.Column([[sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))]], key='-COL_DENSITY-', visible=False)],
+        [sg.HorizontalSeparator()],
+        [sg.Checkbox("Use CMYK Layers", key="-DITHER_CMYK-", default=False, enable_events=True)],
+        [sg.Column([
+            [
+                sg.Checkbox("C", key="-DITHER_CMYK_C-", default=True, text_color="cyan"), 
+                sg.Checkbox("M", key="-DITHER_CMYK_M-", default=True, text_color="magenta"), 
+                sg.Checkbox("Y", key="-DITHER_CMYK_Y-", default=True, text_color="yellow"), 
+                sg.Checkbox("K", key="-DITHER_CMYK_K-", default=True, text_color="black")
+            ],
+            [sg.Text("Pixel Offset:", s=(15, 1)), sg.Input("1", key="-DITHER_PIXEL_OFFSET-", s=(10, 1))]
+        ], key='-COL_DITHER_CMYK-', visible=False)],
+        [sg.HorizontalSeparator()],
         [sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"), sg.Button("Stop", key="-BTN_STOP_DITHER-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],

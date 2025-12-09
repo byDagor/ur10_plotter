@@ -144,7 +144,7 @@ def _render_document_to_image_element(window: sg.Window, document: vpype.Documen
         window[image_key].update(data=bio.getvalue())
 
 def update_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool, image_key: str):
-    _render_document_to_image_element(window, document, is_cmyk, image_key)
+    _render_document_to_image_element(window, document, image_key, is_cmyk)
 
 def update_svg_preview(window: sg.Window, document: vpype.Document):
     _render_document_to_image_element(window, document, "-SVG_PREVIEW_IMAGE-", False)
@@ -155,5 +155,5 @@ def update_flow_preview(window: sg.Window, document: vpype.Document, is_cmyk: bo
 def update_hatched_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool):
     _render_document_to_image_element(window, document, "-PREVIEW_IMAGE_HATCHED-", is_cmyk)
 
-def update_dither_preview(window: sg.Window, document: vpype.Document):
-    _render_document_to_image_element(window, document, "-PREVIEW_IMAGE_DITHER-", False)
+def update_dither_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool = False):
+    _render_document_to_image_element(window, document, "-PREVIEW_IMAGE_DITHER-", is_cmyk)
