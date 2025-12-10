@@ -486,12 +486,14 @@ def main():
                     if save_path:
                         try:
                             window[log_key].print(f"Saving SVG to {save_path}...")
-                            vpype.write(save_path, doc_to_save)
+                            with open(save_path, "w", encoding="utf-8") as f:
+                                vpype.write_svg(f, doc_to_save)
                             window[log_key].print("SVG file saved successfully.")
                         except Exception as e:
                             print(f"Error saving file: {e}")
                             sg.popup_error(f"Error saving file: {e}")
-                    else: window[log_key].print("SVG save cancelled.")
+                    else:
+                        window[log_key].print("SVG save cancelled.")
                 
                 # --- UR10 Control Events ---
                 elif event == "-BTN_UR10_CONNECT-":
