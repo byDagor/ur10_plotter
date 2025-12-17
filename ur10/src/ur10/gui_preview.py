@@ -157,3 +157,6 @@ def update_hatched_preview(window: sg.Window, document: vpype.Document, is_cmyk:
 
 def update_dither_preview(window: sg.Window, document: vpype.Document, is_cmyk: bool = False):
     _render_document_to_image_element(window, document, "-PREVIEW_IMAGE_DITHER-", is_cmyk)
+
+def update_text_preview(window: sg.Window, document: vpype.Document):
+    _render_document_to_image_element(window, document, "-PREVIEW_IMAGE_TEXT-", is_cmyk=False)

@@ -10,13 +10,14 @@ import json
 import math
 
 from gui_layout import create_layout
-from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview, update_dither_preview, preview_dots_from_svg
+from gui_preview import update_preview, update_svg_preview, update_flow_preview, update_hatched_preview, update_dither_preview, update_text_preview, preview_dots_from_svg
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from vectorizers.dither_vectorizer import run_dither_thread
 from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
 from robot.svg_parser import parse_svg
 from dither_converter import _convert_dither_circles_to_points
+from text_object import TextObject
 
 
 def main():
@@ -30,6 +31,9 @@ def main():
     stop_flow_event = threading.Event()
     stop_hatched_event = threading.Event()
     stop_dither_event = threading.Event()
+    
+    text_objects = []
+    selected_index = -1
     
     # Load home position from config file
     home_pose = None
@@ -51,6 +55,7 @@ def main():
     flow_document: Union[vpype.Document, None] = None
     hatched_document: Union[vpype.Document, None] = None
     dither_document: Union[vpype.Document, None] = None
+    text_document: Union[vpype.Document, None] = None
     dither_is_cmyk = False
 
     ur10_controller: Union[UR10Controller, None] = None
@@ -61,6 +66,21 @@ def main():
     update_hatched_preview(window, None, is_cmyk=False)
     update_dither_preview(window, None)
     update_svg_preview(window, None)
+
+    # --- SVG Text Logic ---
+    def get_settings_from_gui(values):
+        try:
+            return TextObject(
+                text=values["-TEXT_INPUT-"],
+                x=float(values["-TEXT_POS_X-"]),
+                y=float(values["-TEXT_POS_Y-"]),
+                font_family=values["-TEXT_FONT-"],
+                font_size=int(values["-TEXT_FONT_SIZE-"]),
+                is_bold=values["-TEXT_BOLD-"],
+                is_italic=values["-TEXT_ITALIC-"]
+            )
+        except ValueError:
+            return None
 
     # --- Event Loop ---
     try:
@@ -78,6 +98,8 @@ def main():
                     window["-LOG_HATCHED-"].print(values[event])
                 elif active_tab == "-TAB_DITHER-":
                     window["-LOG_DITHER-"].print(values[event])
+                elif active_tab == "-TAB_TEXT-":
+                    window["-LOG_TEXT-"].print(values[event])
                 else:
                     print(f"Log message from unhandled tab '{active_tab}': {values[event]}")
                 continue
@@ -226,6 +248,86 @@ def main():
                     window["-BTN_VECTORIZE_DITHER-"].update(disabled=True)
                     window["-BTN_STOP_DITHER-"].update(disabled=False)
                     threading.Thread(target=run_dither_thread, args=(window, params, stop_dither_event), daemon=True).start()
+
+                elif event == "-TEXT_ADD-":
+                    new_obj = get_settings_from_gui(values)
+                    if new_obj:
+                        text_objects.append(new_obj)
+                        window["-TEXT_LIST-"].update([str(o) for o in text_objects])
+
+                elif event == "-TEXT_LIST-" and len(values["-TEXT_LIST-"]) > 0:
+                    indexes = window["-TEXT_LIST-"].get_indexes()
+                    if indexes:
+                        selected_index = indexes[0]
+                        obj = text_objects[selected_index]
+                        
+                        window["-TEXT_INPUT-"].update(obj.text)
+                        window["-TEXT_POS_X-"].update(obj.x)
+                        window["-TEXT_POS_Y-"].update(obj.y)
+                        window["-TEXT_FONT-"].update(obj.font_family)
+                        window["-TEXT_FONT_SIZE-"].update(obj.font_size)
+                        window["-TEXT_BOLD-"].update(obj.is_bold)
+                        window["-TEXT_ITALIC-"].update(obj.is_italic)
+                        
+                        window["-TEXT_UPDATE-"].update(disabled=False)
+                        window["-TEXT_DELETE-"].update(disabled=False)
+
+                elif event == "-TEXT_UPDATE-" and selected_index >= 0:
+                    updated_obj = get_settings_from_gui(values)
+                    if updated_obj:
+                        text_objects[selected_index] = updated_obj
+                        window["-TEXT_LIST-"].update([str(o) for o in text_objects])
+                        window["-TEXT_UPDATE-"].update(disabled=True)
+                        window["-TEXT_DELETE-"].update(disabled=True)
+                        selected_index = -1
+                
+                elif event == "-TEXT_DELETE-" and selected_index >= 0:
+                    del text_objects[selected_index]
+                    window["-TEXT_LIST-"].update([str(o) for o in text_objects])
+                    window["-TEXT_UPDATE-"].update(disabled=True)
+                    window["-TEXT_DELETE-"].update(disabled=True)
+                    selected_index = -1
+
+                elif event == "-TEXT_PREVIEW-":
+                    if not text_objects:
+                        window["-LOG_TEXT-"].print("No text objects to preview.")
+                        continue
+                    
+                    cmd_str = ""
+                    for obj in text_objects:
+                        lines = obj.text.split('\n')
+                        for i, line in enumerate(lines):
+                            y_pos = obj.y + i * obj.font_size * obj.line_spacing
+                            cmd_str += f"text -f \"{obj.font_family}\" -s {obj.font_size} -p {obj.x}mm {y_pos}mm \"{line}\" "
+
+                    try:
+                        window["-LOG_TEXT-"].print("Generating SVG preview from text objects...")
+                        doc = execute(cmd_str)
+                        text_document = doc
+                        update_text_preview(window, text_document)
+                        window["-LOG_TEXT-"].print("Preview generated successfully.")
+                        window["-TEXT_SAVE_SVG-"].update(disabled=False)
+                    except Exception as e:
+                        window["-LOG_TEXT-"].print(f"Error generating SVG: {e}")
+                        sg.popup_error(f"Error generating SVG: {e}")
+
+                elif event == "-TEXT_SAVE_SVG-":
+                    if text_document is None:
+                        window["-LOG_TEXT-"].print("No SVG document to save. Generate one first.")
+                        continue
+                    
+                    try:
+                        save_path = sg.popup_get_file("Save As", save_as=True, no_window=True, default_extension=".svg", file_types=(("SVG", "*.svg"),))
+                        if save_path:
+                            window["-LOG_TEXT-"].print(f"Saving SVG to {save_path}...")
+                            with open(save_path, "w", encoding="utf-8") as f:
+                                vpype.write_svg(f, text_document)
+                            window["-LOG_TEXT-"].print("SVG file saved successfully.")
+                            window["-SVG_PATH-"].update(save_path)
+                            window["-TAB_UR10-"].select()
+                    except Exception as e:
+                        window["-LOG_TEXT-"].print(f"Error saving file: {e}")
+                        sg.popup_error(f"Error saving file: {e}")
 
                 elif event == "-DITHER_CMYK-":
                     is_cmyk = values[event]
@@ -573,12 +675,14 @@ def main():
                     else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 elif event == "-DRAW_LINE-":
+                    is_dither = values["-RENDER_AS_DOTS-"]
                     start_point, end_point = values[event]
                     graph_size = window["-REALTIME_GRAPH-"].CanvasSize
                     width, height = scaled_dims["width"], scaled_dims["height"]
                     corner = values["-CANVAS_CORNER-"]
                     home_x, home_y = home_pose[0], home_pose[1]
                     rotation_angle = values["-GLOBAL_ROTATION-"]
+                    
                     def unrotate_point(p_rotated):
                         angle_rad = math.radians(-(rotation_angle + 45))
                         cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
@@ -586,21 +690,30 @@ def main():
                         x_unrotated = home_x + (x_r - home_x) * cos_a - (y_r - home_y) * sin_a
                         y_unrotated = home_y + (x_r - home_x) * sin_a + (y_r - home_y) * cos_a
                         return (x_unrotated, y_unrotated)
+
                     start_unrotated, end_unrotated = unrotate_point(start_point), unrotate_point(end_point)
+
                     def transform_coordinates(x, y):
                         if corner == "Top Left": min_x, max_x, min_y, max_y = home_x, home_x + width, home_y - height, home_y
                         elif corner == "Top Right": min_x, max_x, min_y, max_y = home_x - width, home_x, home_y - height, home_y
                         elif corner == "Bottom Left": min_x, max_x, min_y, max_y = home_x, home_x + width, home_y, home_y + height
                         elif corner == "Bottom Right": min_x, max_x, min_y, max_y = home_x - width, home_x, home_y, home_y + height
                         else: min_x, max_x, min_y, max_y = home_x, home_x + width, home_y - height, home_y
+                        
                         norm_x = (x - min_x) / (max_x - min_x) if (max_x - min_x) != 0 else 0
                         norm_y = (y - min_y) / (max_y - min_y) if (max_y - min_y) != 0 else 0
+                        
                         graph_x = norm_x * graph_size[0]
                         graph_y = graph_size[1] - (norm_y * graph_size[1])
                         return graph_x, graph_y
-                    x1, y1 = transform_coordinates(start_unrotated[0], start_unrotated[1])
-                    x2, y2 = transform_coordinates(end_unrotated[0], end_unrotated[1])
-                    window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
+
+                    if is_dither:
+                        x, y = transform_coordinates(start_unrotated[0], start_unrotated[1])
+                        window["-REALTIME_GRAPH-"].draw_point((x,y), size=1, color='black')
+                    else:
+                        x1, y1 = transform_coordinates(start_unrotated[0], start_unrotated[1])
+                        x2, y2 = transform_coordinates(end_unrotated[0], end_unrotated[1])
+                        window["-REALTIME_GRAPH-"].draw_line((x1, y1), (x2, y2), color='black')
 
                 elif event == "-BTN_PAUSE-":
                     if ur10_controller and ur10_controller.is_connected:

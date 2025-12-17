@@ -119,7 +119,50 @@ def create_layout():
         sg.Column([[sg.Image(key="-PREVIEW_IMAGE_DITHER-", background_color="white", expand_x=True, expand_y=True)]], expand_x=True, expand_y=True, pad=(0,0))
     ]]
 
-    # --- Tab 4: UR10 Control ---
+    # --- Tab 4: Text ---
+    text_editor_controls = [
+        [sg.Text("Current Text Object", font=("Arial", 10, "bold"))],
+        [sg.Text("Content:")],
+        [sg.Multiline("Hello", size=(30, 4), key="-TEXT_INPUT-", enable_events=True)],
+        [sg.Text("Font:", size=(5,1)), sg.Combo(["Hershey", "astrology", "cursive", "cyrillic", "futural", "futuram", "gothgbt", "gothgrt", "gothiceng", "gothicger", "gothicita", "gothitt", "greek", "japanese", "markers", "mathlow", "mathupp", "meteorology", "music", "scriptc", "scripts", "symbolic", "timesg", "timesi", "timesib", "timesr", "timesrb"], default_value="futural", size=(20,1), key="-TEXT_FONT-", enable_events=True)],
+        [sg.Text("Pos X:", size=(5,1)), sg.Input(20, size=(6,1), key="-TEXT_POS_X-", enable_events=True),
+         sg.Text("Pos Y:", size=(5,1)), sg.Input(40, size=(6,1), key="-TEXT_POS_Y-", enable_events=True)],
+        [sg.Text("Size:", size=(5,1)), sg.Slider(range=(5, 100), default_value=20, orientation='h', size=(15,10), key="-TEXT_FONT_SIZE-", enable_events=True)],
+        [sg.Checkbox("Bold", key="-TEXT_BOLD-", enable_events=True), 
+         sg.Checkbox("Italic", key="-TEXT_ITALIC-", enable_events=True)],
+        [sg.Button("Add New Text", button_color="green", key="-TEXT_ADD-"), 
+         sg.Button("Update Selected", button_color="orange", key="-TEXT_UPDATE-", disabled=True),
+         sg.Button("Delete", button_color="red", key="-TEXT_DELETE-", disabled=True)]
+    ]
+
+    text_list_controls = [
+        [sg.Text("Objects on Canvas", font=("Arial", 10, "bold"))],
+        [sg.Listbox(values=[], size=(45, 6), key="-TEXT_LIST-", enable_events=True)]
+    ]
+
+    text_canvas_controls = [
+        [sg.Text("Canvas Size (mm)", font=("Arial", 10, "bold"))],
+        [sg.Text("W:", size=(3,1)), sg.Input(210, size=(6,1), key="-TEXT_CANVAS_W-", enable_events=True),
+            sg.Text("H:", size=(3,1)), sg.Input(297, size=(6,1), key="-TEXT_CANVAS_H-", enable_events=True)]
+    ]
+
+    text_controls = [
+        [sg.Frame("", text_canvas_controls)],
+        [sg.Frame("", text_editor_controls)],
+        [sg.Frame("", text_list_controls)],
+        [sg.Button("Preview", key="-TEXT_PREVIEW-", expand_x=True)],
+        [sg.Button("Save SVG", key="-TEXT_SAVE_SVG-", expand_x=True, button_color=("white", "green"), disabled=True)],
+        [sg.Text("Status:")],
+        [sg.Multiline(key="-LOG_TEXT-", size=(50, 10), autoscroll=True, disabled=True, expand_x=True)],
+    ]
+
+    text_tab_layout = [[
+        sg.Column(text_controls, scrollable=True, vertical_scroll_only=True, size=CONTROLS_SIZE, pad=(0,0)),
+        sg.VSeparator(),
+        sg.Column([[sg.Image(key="-PREVIEW_IMAGE_TEXT-", background_color="white", expand_x=True, expand_y=True)]], expand_x=True, expand_y=True, pad=(0,0))
+    ]]
+    
+    # --- Tab 5: UR10 Control ---
     ur10_controls = [
         [sg.Text("UR10 Robot Control", font="Helvetica 12")],
         [sg.HorizontalSeparator()],
@@ -232,6 +275,7 @@ def create_layout():
             sg.Tab("Flow Imager", flow_tab_layout, key="-TAB_FLOW-"),
             sg.Tab("Hatched", hatched_tab_layout, key="-TAB_HATCHED-"),
             sg.Tab("Dither", dither_tab_layout, key="-TAB_DITHER-"),
+            sg.Tab("Text", text_tab_layout, key="-TAB_TEXT-"),
             sg.Tab("UR10 Control", ur10_tab_layout, key="-TAB_UR10-"),
             sg.Tab("Instructions", instructions_tab, key="-TAB_INSTRUCTIONS-")
         ]], key="-TABGROUP-", expand_x=True, expand_y=True)
