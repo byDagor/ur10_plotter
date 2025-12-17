@@ -76,6 +76,7 @@ def main():
                 y=float(values["-TEXT_POS_Y-"]),
                 font_family=values["-TEXT_FONT-"],
                 font_size=int(values["-TEXT_FONT_SIZE-"]),
+                line_spacing=float(values["-TEXT_LINE_SPACING-"]),
                 is_bold=values["-TEXT_BOLD-"],
                 is_italic=values["-TEXT_ITALIC-"]
             )
@@ -266,6 +267,7 @@ def main():
                         window["-TEXT_POS_Y-"].update(obj.y)
                         window["-TEXT_FONT-"].update(obj.font_family)
                         window["-TEXT_FONT_SIZE-"].update(obj.font_size)
+                        window["-TEXT_LINE_SPACING-"].update(obj.line_spacing)
                         window["-TEXT_BOLD-"].update(obj.is_bold)
                         window["-TEXT_ITALIC-"].update(obj.is_italic)
                         

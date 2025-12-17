@@ -128,6 +128,7 @@ def create_layout():
         [sg.Text("Pos X:", size=(5,1)), sg.Input(20, size=(6,1), key="-TEXT_POS_X-", enable_events=True),
          sg.Text("Pos Y:", size=(5,1)), sg.Input(40, size=(6,1), key="-TEXT_POS_Y-", enable_events=True)],
         [sg.Text("Size:", size=(5,1)), sg.Slider(range=(5, 100), default_value=20, orientation='h', size=(15,10), key="-TEXT_FONT_SIZE-", enable_events=True)],
+        [sg.Text("Line Spacing:", size=(15,1)), sg.Input("1.2", size=(10,1), key="-TEXT_LINE_SPACING-", enable_events=True)],
         [sg.Checkbox("Bold", key="-TEXT_BOLD-", enable_events=True), 
          sg.Checkbox("Italic", key="-TEXT_ITALIC-", enable_events=True)],
         [sg.Button("Add New Text", button_color="green", key="-TEXT_ADD-"), 

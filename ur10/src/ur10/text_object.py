@@ -14,4 +14,4 @@ class TextObject:
         if self.is_bold: style.append("B")
         if self.is_italic: style.append("I")
         style_str = f"[{','.join(style)}]" if style else ""
-        return f"{self.text[:15]}... {style_str} ({self.font_family}, {self.font_size}pt)"
+        return f"{self.text[:15]}... {style_str} ({self.font_family}, {self.font_size}mm, {self.line_spacing}em)"
