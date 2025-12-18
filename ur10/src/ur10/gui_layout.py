@@ -1,6 +1,6 @@
 import FreeSimpleGUI as sg
 
-def create_layout():
+def create_layout(safe_z_offset, pen_change_z_offset):
     """
     Creates the main GUI layout with a flexible, expanding preview structure.
     """
@@ -202,7 +202,7 @@ def create_layout():
     
     # --- Instructions Tab ---
     LBL_W = 25 # Width of the label column
-    DESC_W = 100 # Width of the description column (with wrapping)
+    DESC_W = 120 # Width of the description column (with wrapping)
     
     flow_instructions_layout = [
         [sg.Text("Flow Imager Parameters", font="Helvetica 12 bold", pad=((0,0),(10,5)))],
@@ -267,15 +267,15 @@ def create_layout():
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
         [sg.Text("Connect to UR10:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Connects to the robot at the specified IP address.", size=(DESC_W, None))],
         [sg.Text("SVG File:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The SVG file to be plotted by the robot.", size=(DESC_W, None))],
-        [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Move the robot so the pen is touching the canvas corner. This sets the 'drawing Z-height'. The robot's actual home will be 20mm above this point.", size=(DESC_W, None))],
+        [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text(f"Move the robot so the pen is touching the canvas corner. This sets the 'drawing Z-height'. The robot's actual home will be {safe_z_offset*1000}mm above this point.", size=(DESC_W, None))],
         [sg.Text("Canvas Corner:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The corner of the canvas to use as the origin.", size=(DESC_W, None))],
         [sg.Text("Canvas Width/Height:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The dimensions of the canvas in millimeters.", size=(DESC_W, None))],
-        [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("If checked, the robot will move at the higher 'home' Z-height, 20mm above the canvas.", size=(DESC_W, None))],
+        [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text(f"If checked, the robot will move at the higher 'home' Z-height, {safe_z_offset*1000}mm above the canvas.", size=(DESC_W, None))],
         [sg.Text("Start Plotting:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Starts the plotting process.", size=(DESC_W, None))],
         [sg.Text("Pause/Resume:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Pauses the plotting process and lifts the pen. Press again to resume.", size=(DESC_W, None))],
         [sg.Text("Stop:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Stops the plotting process and returns the robot to its home position.", size=(DESC_W, None))],
-        [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the safe home position (20mm above the canvas).", size=(DESC_W, None))],
-        [sg.Text("Pen Change:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to a safe position for changing the pen.", size=(DESC_W, None))],
+        [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text(f"Moves the robot to the safe home position ({safe_z_offset*1000}mm above the canvas).", size=(DESC_W, None))],
+        [sg.Text("Pen Change:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text(f"Moves the robot to a safe position for changing the pen ({pen_change_z_offset*1000}mm above the canvas).", size=(DESC_W, None))],
     ]
 
     instructions_tab = [[sg.TabGroup([

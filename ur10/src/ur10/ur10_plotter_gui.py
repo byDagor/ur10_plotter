@@ -14,7 +14,7 @@ from gui_preview import update_preview, update_svg_preview, update_flow_preview,
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from vectorizers.dither_vectorizer import run_dither_thread
-from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET, RobotStatus
+from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET, PEN_CHANGE_Z_OFFSET, RobotStatus
 from robot.svg_parser import parse_svg
 from dither_converter import _convert_dither_circles_to_points
 from text_object import TextObject
@@ -25,7 +25,7 @@ def main():
     Main event loop for the application.
     """
     
-    layout = create_layout()
+    layout = create_layout(SAFE_Z_OFFSET, PEN_CHANGE_Z_OFFSET)
     window = sg.Window("PLOTTUR10", layout, finalize=True, resizable=True)
     
     stop_flow_event = threading.Event()
