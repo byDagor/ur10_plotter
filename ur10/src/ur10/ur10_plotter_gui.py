@@ -14,7 +14,7 @@ from gui_preview import update_preview, update_svg_preview, update_flow_preview,
 from vectorizers.flow_vectorizer import run_vectorize_thread
 from vectorizers.hatched_vectorizer import run_hatched_thread
 from vectorizers.dither_vectorizer import run_dither_thread
-from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET
+from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET, RobotStatus
 from robot.svg_parser import parse_svg
 from dither_converter import _convert_dither_circles_to_points
 from text_object import TextObject
@@ -352,13 +352,19 @@ def main():
                 elif event == "-THREAD_DONE-":
                     doc_from_thread, message, is_cmyk = values[event]
                     
-                    if message in ("Real-time path execution complete.", "Real-time path execution stopped."):
-                        window["-UR10_STATUS-"].print(message)
+                    if isinstance(message, RobotStatus):
+                        window["-UR10_STATUS-"].print(message.value)
                         window["-BTN_START-"].update(disabled=False)
                         window["-BTN_PAUSE-"].update(text="Pause", disabled=True)
                         window["-BTN_STOP-"].update(disabled=True)
                         window["-BTN_UR10_HOME-"].update(disabled=False)
                         window["-BTN_CHECK_CANVAS-"].update(disabled=False)
+                        window["-BTN_PEN_CHANGE-"].update(disabled=False)
+                        if message == RobotStatus.EXECUTION_COMPLETE:
+                            if ur10_controller and home_pose:
+                                window["-UR10_STATUS-"].print("Moving to pen change position...")
+                                ur10_controller.go_to_pen_change_position(home_pose)
+                                window["-UR10_STATUS-"].print("Robot is at pen change position.")
                         continue
 
                     if ("Flow Imager" in message and stop_flow_event.is_set()) or \
@@ -612,6 +618,7 @@ def main():
                             window["-BTN_UR10_HOME-"].update(disabled=False)
                             window["-BTN_SET_HOME-"].update(disabled=False)
                             window["-BTN_CHECK_CANVAS-"].update(disabled=False)
+                            window["-BTN_PEN_CHANGE-"].update(disabled=False)
                         else:
                             window["-UR10_STATUS-"].print("Connection failed.")
                             ur10_controller = None
@@ -625,6 +632,7 @@ def main():
                         window["-BTN_UR10_HOME-"].update(disabled=True)
                         window["-BTN_SET_HOME-"].update(disabled=True)
                         window["-BTN_CHECK_CANVAS-"].update(disabled=True)
+                        window["-BTN_PEN_CHANGE-"].update(disabled=True)
                         ur10_controller = None
 
                 elif event == "-BTN_SET_HOME-":
@@ -669,6 +677,7 @@ def main():
                                 window["-BTN_STOP-"].update(disabled=False)
                                 window["-BTN_UR10_HOME-"].update(disabled=True)
                                 window["-BTN_CHECK_CANVAS-"].update(disabled=True)
+                                window["-BTN_PEN_CHANGE-"].update(disabled=True)
                                 window["-REALTIME_GRAPH-"].erase()
                                 threading.Thread(target=ur10_controller.execute_path_realtime, args=(path, home_pose, speed_control, acceleration, window, dry_run), daemon=True).start()
                             else: window["-UR10_STATUS-"].print("Error: Could not parse SVG path.")
@@ -725,12 +734,14 @@ def main():
                             window["-UR10_STATUS-"].print("Plotting paused.")
                             window["-BTN_UR10_HOME-"].update(disabled=False)
                             window["-BTN_CHECK_CANVAS-"].update(disabled=False)
+                            window["-BTN_PEN_CHANGE-"].update(disabled=False)
                         else:
                             ur10_controller.pause_event.clear()
                             window["-BTN_PAUSE-"].update(text="Pause")
                             window["-UR10_STATUS-"].print("Plotting resumed.")
                             window["-BTN_UR10_HOME-"].update(disabled=True)
                             window["-BTN_CHECK_CANVAS-"].update(disabled=True)
+                            window["-BTN_PEN_CHANGE-"].update(disabled=True)
 
                 elif event == "-BTN_STOP-":
                     if ur10_controller and ur10_controller.is_connected:
@@ -776,6 +787,17 @@ def main():
                         except ValueError: window["-UR10_STATUS-"].print("Error: Invalid Canvas Width or Height.")
                         except Exception as e: window["-UR10_STATUS-"].print(f"An error occurred: {e}")
                     else: window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
+
+                elif event == "-BTN_PEN_CHANGE-":
+                    if ur10_controller and ur10_controller.is_connected:
+                        if home_pose:
+                            window["-UR10_STATUS-"].print("Moving robot to pen change position...")
+                            ur10_controller.go_to_pen_change_position(home_pose)
+                            window["-UR10_STATUS-"].print("Robot is at pen change position.")
+                        else:
+                            window["-UR10_STATUS-"].print("Error: Home position not set.")
+                    else:
+                        window["-UR10_STATUS-"].print("Error: Not connected to the robot.")
 
                 if 'speed_control' in locals():
                     speed_control[0] = values["-PLOT_SPEED-"]

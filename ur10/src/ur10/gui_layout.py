@@ -174,7 +174,7 @@ def create_layout():
         [sg.Text("Acceleration (m/s^2):", s=(15, 1)), sg.Slider(range=(0.05, 2.0), default_value=0.5, resolution=0.01, orientation="h", key="-PLOT_ACCEL-", s=(30, 20))],
         [sg.Checkbox("Dry Run", key="-DRY_RUN-", default=False)],
         [sg.Button("Start Plotting", key="-BTN_START-", expand_x=True, disabled=True, button_color=("white", "green")), sg.Button("Pause", key="-BTN_PAUSE-", expand_x=True, disabled=True, button_color=("white", "orange")), sg.Button("Stop", key="-BTN_STOP-", expand_x=True, disabled=True, button_color=("white", "red"))],
-        [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True)],
+        [sg.Button("Go Home", key="-BTN_UR10_HOME-", expand_x=True, disabled=True), sg.Button("Pen Change", key="-BTN_PEN_CHANGE-", expand_x=True, disabled=True)],
         [sg.Button("Check Canvas", key="-BTN_CHECK_CANVAS-", expand_x=True, disabled=True)],
         [sg.HorizontalSeparator()],
         [sg.Text("Status:")],

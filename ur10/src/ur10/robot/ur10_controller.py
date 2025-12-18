@@ -2,8 +2,14 @@ import rtde_control
 import rtde_receive
 import threading
 import time
+from enum import Enum
 
-SAFE_Z_OFFSET = 0.010 #0.005
+class RobotStatus(Enum):
+    EXECUTION_COMPLETE = "Real-time path execution complete."
+    EXECUTION_STOPPED = "Real-time path execution stopped."
+
+SAFE_Z_OFFSET = 0.010 #0.005 #Meters
+PEN_CHANGE_Z_OFFSET = 0.2 #Meters
 
 class UR10Controller:
     def __init__(self, ip_address="10.0.10.208"):
@@ -127,7 +133,7 @@ class UR10Controller:
                     self.go_home(home_pose, speed=0.5, acceleration=acceleration)
                     
                     # 3. Send stopped message and exit thread
-                    window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution stopped.", False))
+                    window.write_event_value("-THREAD_DONE-", (None, RobotStatus.EXECUTION_STOPPED, False))
                     print("Path execution stopped by user.")
                     return # Exit the function immediately
 
@@ -193,11 +199,11 @@ class UR10Controller:
                     self.move_to(pen_up_pose, speed=0.5, acceleration=acceleration)
             
             self.go_home(home_pose, acceleration=acceleration)
-            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution stopped.", False))
+            window.write_event_value("-THREAD_DONE-", (None, RobotStatus.EXECUTION_STOPPED, False))
             print("Path execution stopped by user.")
         else:
             self.go_home(home_pose, acceleration=acceleration)
-            window.write_event_value("-THREAD_DONE-", (None, "Real-time path execution complete.", False))
+            window.write_event_value("-THREAD_DONE-", (None, RobotStatus.EXECUTION_COMPLETE, False))
             print("Path execution complete.")
 
     def go_home(self, home_pose, speed=0.5, acceleration=1.2):
@@ -208,6 +214,15 @@ class UR10Controller:
             safe_home_pose = home_pose.copy()
             safe_home_pose[2] += SAFE_Z_OFFSET
             self.move_to(safe_home_pose, speed=speed, acceleration=acceleration)
+
+    def go_to_pen_change_position(self, home_pose, speed=0.5, acceleration=1.2):
+        """
+        Moves the robot to a safe position for changing the pen.
+        """
+        if self.is_connected and home_pose:
+            pen_change_pose = home_pose.copy()
+            pen_change_pose[2] += PEN_CHANGE_Z_OFFSET
+            self.move_to(pen_change_pose, speed=speed, acceleration=acceleration)
 
     def execute_move_sequence(self, poses, speed=0.25, acceleration=1.2):
         """
