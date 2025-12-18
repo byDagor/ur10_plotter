@@ -204,10 +204,7 @@ def create_layout():
     LBL_W = 25 # Width of the label column
     DESC_W = 100 # Width of the description column (with wrapping)
     
-    instructions_layout = [
-        [sg.Text("Parameter Explanations", font="Helvetica 14 bold")],
-        [sg.HorizontalSeparator()],
-        
+    flow_instructions_layout = [
         [sg.Text("Flow Imager Parameters", font="Helvetica 12 bold", pad=((0,0),(10,5)))],
         [sg.Text("Noise Coeff:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls 'wiggliness'. 0.0 is smooth, 0.05 is chaotic. (Ratio)", size=(DESC_W, None))],
         [sg.Text("Min/Max Separation:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Controls line density. (mm)", size=(DESC_W, None))],
@@ -220,7 +217,9 @@ def create_layout():
         [sg.Text("Use CMYK Layers:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Separates into C, M, Y, K layers (1-4) for multi-pen plotting.", size=(DESC_W, None))],
         [sg.Text("K-d Tree (-kdt):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Uses a different search algorithm. Uncheck if you get errors.", size=(DESC_W, None))],
         [sg.Text("Trim Border (-tm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Removes lines that are exactly on the image border.", size=(DESC_W, None))],
+    ]
 
+    hatched_instructions_layout = [
         [sg.Text("Hatched Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
         [sg.Text("Image Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Downscales image. 0.5 = 50%. Improves performance. (Ratio)", size=(DESC_W, None))],
         [sg.Text("Hatch Offset:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Shifts the starting point of the hatch pattern. (px)", size=(DESC_W, None))],
@@ -235,9 +234,11 @@ def create_layout():
         [sg.Text("H-Mirror:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Flips the image horizontally.", size=(DESC_W, None))],
         [sg.Text("Draw Contours:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the outlines of the shadow shapes.", size=(DESC_W, None))],
         [sg.Text("Draw Hatch Fill:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Draws the shading lines inside the contours.", size=(DESC_W, None))],
+    ]
 
+    dither_instructions_layout = [
         [sg.Text("Dither Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
-        [sg.Text("Dot Radius (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The radius of each dot in the final drawing. Should be half your physical pen's diameter.", size=(DESC_W, None))],
+        [sg.Text("Pen Diameter (mm):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The diameter of the pen used for dithering.", size=(DESC_W, None))],
         [sg.Text("Detail (Horizontal Dots):", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The number of possible dot positions horizontally. This controls the output resolution.", size=(DESC_W, None))],
         [sg.Text("Dithering Method:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The algorithm used to generate the dot pattern.", size=(DESC_W, None))],
         [sg.Text("  - Floyd-Steinberg:", font="Helvetica 10", size=(LBL_W,1)), sg.Text("High-quality, organic-looking error diffusion.", size=(DESC_W, None))],
@@ -245,22 +246,48 @@ def create_layout():
         [sg.Text("  - Stochastic (Random):", font="Helvetica 10", size=(LBL_W,1)), sg.Text("Noisy, organic, but potentially messy pattern.", size=(DESC_W, None))],
         [sg.Text("Contrast:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Floyd-Steinberg. Adjusts image contrast before dithering. 1.0 is normal.", size=(DESC_W, None))],
         [sg.Text("Density:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Used by Ordered and Stochastic methods. Adjusts the overall darkness. (Multiplier)", size=(DESC_W, None))],
+    ]
+    
+    text_instructions_layout = [
+        [sg.Text("Text Parameters", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
+        [sg.Text("Content:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The text to be plotted. Line breaks are supported.", size=(DESC_W, None))],
+        [sg.Text("Font:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The font to be used. The available fonts are the ones built into vpype-text.", size=(DESC_W, None))],
+        [sg.Text("Pos X/Y:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The position of the top-left corner of the text in millimeters.", size=(DESC_W, None))],
+        [sg.Text("Size:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The font size in millimeters.", size=(DESC_W, None))],
+        [sg.Text("Line Spacing:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The spacing between lines of text, as a multiplier of the font size.", size=(DESC_W, None))],
+        [sg.Text("Add New Text:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Adds the current text from the editor as a new object to the list.", size=(DESC_W, None))],
+        [sg.Text("Update Selected:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Updates the selected text object with the current values from the editor.", size=(DESC_W, None))],
+        [sg.Text("Delete:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Deletes the selected text object.", size=(DESC_W, None))],
+        [sg.Text("Preview:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Generates a preview of the SVG that will be created from all the text objects.", size=(DESC_W, None))],
+        [sg.Text("Save SVG:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Saves the generated SVG to a file.", size=(DESC_W, None))],
+    ]
 
+    ur10_instructions_layout = [
         [sg.Text("UR10 Control", font="Helvetica 12 bold", pad=((0,0),(15,5)))],
         [sg.Text("Robot IP:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The IP address of the UR10 robot.", size=(DESC_W, None))],
         [sg.Text("Connect to UR10:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Connects to the robot at the specified IP address.", size=(DESC_W, None))],
         [sg.Text("SVG File:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The SVG file to be plotted by the robot.", size=(DESC_W, None))],
         [sg.Text("Set Home to Current Position:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Move the robot so the pen is touching the canvas corner. This sets the 'drawing Z-height'. The robot's actual home will be 20mm above this point.", size=(DESC_W, None))],
         [sg.Text("Canvas Corner:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The corner of the canvas to use as the origin.", size=(DESC_W, None))],
-        [sg.Text("SVG Scale:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The scale of the SVG file.", size=(DESC_W, None))],
+        [sg.Text("Canvas Width/Height:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("The dimensions of the canvas in millimeters.", size=(DESC_W, None))],
         [sg.Text("Dry Run:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("If checked, the robot will move at the higher 'home' Z-height, 20mm above the canvas.", size=(DESC_W, None))],
         [sg.Text("Start Plotting:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Starts the plotting process.", size=(DESC_W, None))],
         [sg.Text("Pause/Resume:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Pauses the plotting process and lifts the pen. Press again to resume.", size=(DESC_W, None))],
         [sg.Text("Stop:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Stops the plotting process and returns the robot to its home position.", size=(DESC_W, None))],
         [sg.Text("Go Home:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to the safe home position (20mm above the canvas).", size=(DESC_W, None))],
+        [sg.Text("Pen Change:", font="Helvetica 10 bold", size=(LBL_W,1)), sg.Text("Moves the robot to a safe position for changing the pen.", size=(DESC_W, None))],
     ]
-    instructions_tab = [[sg.Column(instructions_layout, scrollable=True, vertical_scroll_only=True, size=(1080, 600), pad=(0,0))]]
 
+    instructions_tab = [[sg.TabGroup([
+        [
+            sg.Tab("Flow", flow_instructions_layout),
+            sg.Tab("Hatched", hatched_instructions_layout),
+            sg.Tab("Dither", dither_instructions_layout),
+            sg.Tab("Text", text_instructions_layout),
+            sg.Tab("UR10 Control", ur10_instructions_layout)
+        ]
+    ])]]
+    
     # --- Main Layout ---
     layout = [[
         sg.Text("PLOTTUR10 GUI", font="Helvetica 18 bold", pad=((0,0), (0, 10)))
