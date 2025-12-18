@@ -3,7 +3,7 @@ import rtde_receive
 import threading
 import time
 
-SAFE_Z_OFFSET = 0.005
+SAFE_Z_OFFSET = 0.010 #0.005
 
 class UR10Controller:
     def __init__(self, ip_address="10.0.10.208"):

@@ -83,24 +83,24 @@ def create_layout():
         [sg.HorizontalSeparator()],
         [sg.Text("Source Image:", s=(15, 1)), sg.Input(key="-IMG_PATH_DITHER-", s=(30, 1)), sg.FileBrowse(target="-IMG_PATH_DITHER-")],
         [sg.Text("Pen Diameter (mm):", s=(15, 1)), sg.Input("0.35", key="-DITHER_PEN_DIAMETER-", s=(10, 1))],
-        [sg.Text("Canvas Width (mm):", s=(15, 1)), sg.Input("297", key="-DITHER_CANVAS_WIDTH-", s=(10, 1))],
-        [sg.Text("Canvas Height (mm):", s=(15, 1)), sg.Input("210", key="-DITHER_CANVAS_HEIGHT-", s=(10, 1))],
         [sg.Text("Detail (Horizontal Dots):", s=(15, 1)), sg.Slider(range=(50, 500), default_value=150, resolution=1, orientation="h", key="-DITHER_H_DOTS-", s=(30, 20))],
         [sg.Text("Dithering Method:", s=(15,1)), sg.DropDown(["Floyd-Steinberg", "Ordered (Halftone)", "Stochastic (Random)"], default_value="Floyd-Steinberg", key="-DITHER_METHOD-", s=(30,1), enable_events=True)],
-        [sg.Column([[sg.Text("Contrast:", s=(15, 1)), sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))]], key='-COL_CONTRAST-')],
-        [sg.Column([[sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))]], key='-COL_DENSITY-', visible=False)],
-        [sg.HorizontalSeparator()],
+        [
+            sg.Column([[sg.Text("Contrast:", s=(15, 1)), sg.Slider(range=(0.1, 3.0), default_value=1.0, resolution=0.1, orientation="h", key="-DITHER_CONTRAST-", s=(30, 20))]], key='-COL_CONTRAST-'),
+            sg.Column([[sg.Text("Density:", s=(15, 1)), sg.Slider(range=(0.1, 4.0), default_value=1.0, resolution=0.05, orientation="h", key="-DITHER_DENSITY-", s=(30, 20))]], key='-COL_DENSITY-', visible=False)
+        ],
         [sg.Checkbox("Use CMYK Layers", key="-DITHER_CMYK-", default=False, enable_events=True)],
-        [sg.Column([
+        [sg.pin(sg.Column([
+            [sg.HorizontalSeparator()],
             [
                 sg.Checkbox("C", key="-DITHER_CMYK_C-", default=True, text_color="cyan"), 
                 sg.Checkbox("M", key="-DITHER_CMYK_M-", default=True, text_color="magenta"), 
                 sg.Checkbox("Y", key="-DITHER_CMYK_Y-", default=True, text_color="yellow"), 
                 sg.Checkbox("K", key="-DITHER_CMYK_K-", default=True, text_color="black")
             ],
-            [sg.Text("Pixel Offset:", s=(15, 1)), sg.Input("1", key="-DITHER_PIXEL_OFFSET-", s=(10, 1))]
-        ], key='-COL_DITHER_CMYK-', visible=False)],
-        [sg.HorizontalSeparator()],
+            [sg.Text("Pixel Offset:", s=(15, 1)), sg.Input("1", key="-DITHER_PIXEL_OFFSET-", s=(10, 1))],
+            [sg.HorizontalSeparator()]
+        ], key='-COL_DITHER_CMYK-', visible=False))],
         [sg.Button("Vectorize with Dither", key="-BTN_VECTORIZE_DITHER-", expand_x=True, font="Helvetica 10 bold"), sg.Button("Stop", key="-BTN_STOP_DITHER-", expand_x=True, font="Helvetica 10 bold", button_color=("white", "red"), disabled=True)],
         [sg.HorizontalSeparator(pad=((0,0), (10, 10)))],
         [sg.Text("Optimization", font="Helvetica 12")],
@@ -141,14 +141,7 @@ def create_layout():
         [sg.Listbox(values=[], size=(45, 6), key="-TEXT_LIST-", enable_events=True)]
     ]
 
-    text_canvas_controls = [
-        [sg.Text("Canvas Size (mm)", font=("Arial", 10, "bold"))],
-        [sg.Text("W:", size=(3,1)), sg.Input(210, size=(6,1), key="-TEXT_CANVAS_W-", enable_events=True),
-            sg.Text("H:", size=(3,1)), sg.Input(297, size=(6,1), key="-TEXT_CANVAS_H-", enable_events=True)]
-    ]
-
     text_controls = [
-        [sg.Frame("", text_canvas_controls)],
         [sg.Frame("", text_editor_controls)],
         [sg.Frame("", text_list_controls)],
         [sg.Button("Preview", key="-TEXT_PREVIEW-", expand_x=True)],
