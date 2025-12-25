@@ -7,7 +7,7 @@ from skimage.draw import line
 import time
 
 # --- CONSTANTS ---
-CANVAS_SIZE = 800
+CANVAS_SIZE = 600
 
 # --- GUI LAYOUT ---
 controls_column = [
@@ -49,7 +49,7 @@ controls_column = [
     [sg.Checkbox("Invert Image (Uncheck for dark backgrounds)", default=True, key="-INVERT-")],
     
     [sg.HorizontalSeparator()],
-    [sg.Button("1. Preview Target", key="-PREVIEW-"), sg.Button("2. Generate Path", key="-PROCESS-")],
+    [sg.Button("1. Preview Target", key="-PREVIEW-"), sg.Button("2. Generate Path", key="-PROCESS-"), sg.Button("3. Save SVG", key="-SAVE-")],
     [sg.Text("Status: Idle", key="-STATUS-", size=(35, 2))]
 ]
 
@@ -122,6 +122,7 @@ def convert_to_bytes(image_array):
     return buffer.tobytes() if is_success else None
 
 # --- EVENT LOOP ---
+last_generated_segments = []
 while True:
     event, values = window.read(timeout=10)
     if event == sg.WIN_CLOSED: break
@@ -175,6 +176,7 @@ while True:
             current_pos = (int(start_x), int(start_y))
             
             points_batch = [] 
+            temp_segments = []
             start_time = time.time()
             
             # --- THE WALKER LOOP ---
@@ -229,6 +231,7 @@ while True:
                     
                     points_batch.append(current_pos)
                     points_batch.append(best_move)
+                    temp_segments.append((current_pos, best_move))
                     current_pos = best_move
                 else:
                     # Jump to a random dark spot if stuck
@@ -241,10 +244,65 @@ while True:
                         points_batch = [current_pos]
 
             total_time = time.time() - start_time
+            last_generated_segments = temp_segments
             window["-STATUS-"].update(f"Done in {total_time:.2f}s")
 
         except Exception as e:
             sg.popup_error(f"Error: {e}")
             print(e)
+
+    # --- SAVE BUTTON ---
+    if event == "-SAVE-":
+        if not last_generated_segments:
+            sg.popup("No path generated yet!", title="Warning")
+            continue
+            
+        filename = sg.popup_get_file("Save SVG", save_as=True, file_types=(("SVG Files", "*.svg"),), default_extension=".svg")
+        if filename:
+            try:
+                # 1. Calculate Bounding Box
+                all_x = []
+                all_y = []
+                for start_pt, end_pt in last_generated_segments:
+                    all_x.extend([start_pt[0], end_pt[0]])
+                    all_y.extend([start_pt[1], end_pt[1]])
+                
+                if not all_x:
+                     sg.popup("No valid segments found.", title="Error")
+                     continue
+
+                min_x, max_x = min(all_x), max(all_x)
+                min_y, max_y = min(all_y), max(all_y)
+                
+                svg_width = max_x - min_x
+                svg_height = max_y - min_y
+                
+                # Safety for perfectly straight lines
+                if svg_width == 0: svg_width = 1
+                if svg_height == 0: svg_height = 1
+
+                with open(filename, "w") as f:
+                    f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}" viewBox="{min_x} {min_y} {svg_width} {svg_height}">\n')
+                    f.write(f'<g fill="none" stroke="black" stroke-width="1">\n')
+                    
+                    # Optimization: Merge connected segments
+                    if last_generated_segments:
+                        current_path = [last_generated_segments[0][0]]
+                        for start, end in last_generated_segments:
+                            if start == current_path[-1]:
+                                current_path.append(end)
+                            else:
+                                # Flush current path
+                                pts = " ".join([f"{x},{y}" for x, y in current_path])
+                                f.write(f'<polyline points="{pts}" />\n')
+                                current_path = [start, end]
+                        # Flush last path
+                        pts = " ".join([f"{x},{y}" for x, y in current_path])
+                        f.write(f'<polyline points="{pts}" />\n')
+                        
+                    f.write('</g>\n</svg>')
+                sg.popup(f"Saved to {filename}")
+            except Exception as e:
+                sg.popup_error(f"Error saving file: {e}")
 
 window.close()
