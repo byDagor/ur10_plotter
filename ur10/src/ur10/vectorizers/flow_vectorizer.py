@@ -1,4 +1,3 @@
-import FreeSimpleGUI as sg
 import vpype
 from vpype_cli import execute
 import time
@@ -31,7 +30,7 @@ def _vectorize_task(cmd_string: str, result_queue: multiprocessing.Queue):
         result_queue.put((False, str(e)))
 
 
-def run_vectorize_thread(window: sg.Window, cmd_string: str, is_cmyk: bool, stop_event: "threading.Event"):
+def run_vectorize_thread(window, cmd_string: str, is_cmyk: bool, stop_event: "threading.Event"):
     """
     This function runs in a thread and manages a separate process for the
     actual vectorization work. This allows the work to be terminated.

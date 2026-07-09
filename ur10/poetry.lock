@@ -450,6 +450,42 @@ docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
+name = "dearpygui"
+version = "2.3.1"
+description = "DearPyGui: A simple Python GUI Toolkit"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "dearpygui-2.3.1-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:8c3db42d9496e1baed8117148718bb69cab671066435d9f312cafb90d0df530c"},
+    {file = "dearpygui-2.3.1-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:55ce713722583f1c874bfdb458cc3c0c09200c200419a31128534f7a86f9ccff"},
+    {file = "dearpygui-2.3.1-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:853e912c6d1d555711c002f0e1b7d3355b118fe56a42dda92b30e0dbd6528b76"},
+    {file = "dearpygui-2.3.1-cp310-cp310-win_amd64.whl", hash = "sha256:36389e45dda45f91efb1d2d693b2c7198eb987db4799e6442862eba6e5b086bb"},
+    {file = "dearpygui-2.3.1-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:e1a9ffbb845600ab4a171daf2d7e7a1895f5b4433eed248d4cab42766b55fdff"},
+    {file = "dearpygui-2.3.1-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:686423b4f8a30aaf57f1044ec4e3b087beb9cc9b25be812cf92f4e7feff44fd6"},
+    {file = "dearpygui-2.3.1-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:0259a2db7b6c82459ac1402b0d42388a7cd180cd97d7dcb31a5210725c3171d3"},
+    {file = "dearpygui-2.3.1-cp311-cp311-win_amd64.whl", hash = "sha256:76ee38696a8f1f3805751b1588c98d9bb6567b033b91cb0f58111fb9fe907b5b"},
+    {file = "dearpygui-2.3.1-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:6b1efd675a358176b3b76c039587a543d407d8fbb2cc3643a527e0ab7c0f5577"},
+    {file = "dearpygui-2.3.1-cp312-cp312-manylinux1_x86_64.whl", hash = "sha256:364b5b6a0953999fec764d529d9bb0b2cc6ab6ed06188e0ded28237c1475ca98"},
+    {file = "dearpygui-2.3.1-cp312-cp312-manylinux2014_aarch64.whl", hash = "sha256:199dffebda245c9f59aa7c10c3b7f62963237c5f744150ad9be409b27a2661d3"},
+    {file = "dearpygui-2.3.1-cp312-cp312-win_amd64.whl", hash = "sha256:26ed9197cdb30099c665bd1b23724e0dba60ad06b71344ecca7e52748c21874b"},
+    {file = "dearpygui-2.3.1-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:d2d29e72b031886893b32269e1478eff1fd651512e6c2bceda91059c3bc8ee0e"},
+    {file = "dearpygui-2.3.1-cp313-cp313-manylinux1_x86_64.whl", hash = "sha256:e3f64c8d4cae68a3b5be1b7531d08400ccbf1e4ff03c7acfc85954f98993f864"},
+    {file = "dearpygui-2.3.1-cp313-cp313-manylinux2014_aarch64.whl", hash = "sha256:0d8b7a5a04cd4a6e25dbf162aa0405cf12143a1c82b33e371c20e5ba8d9349f3"},
+    {file = "dearpygui-2.3.1-cp313-cp313-win_amd64.whl", hash = "sha256:7946722c50f1e08866dfdb78eb33dd4e67dea1a3cfe4400b159e1c96861116dc"},
+    {file = "dearpygui-2.3.1-cp314-cp314-macosx_13_0_arm64.whl", hash = "sha256:e2cbabd8d383308ea3520360e100d1e95c9a957cd26247431cd4920b23c3b56e"},
+    {file = "dearpygui-2.3.1-cp314-cp314-manylinux1_x86_64.whl", hash = "sha256:953442c7272e57f3686e393edc5cf6ce73cc2f47142739735dfabed403e33770"},
+    {file = "dearpygui-2.3.1-cp314-cp314-manylinux2014_aarch64.whl", hash = "sha256:43a561b5dc589944a3a2b469e5e68f1ab35ae38b3dcdf1f813ed9d6e024153f8"},
+    {file = "dearpygui-2.3.1-cp314-cp314-win_amd64.whl", hash = "sha256:272cc52c66bc5a4a332f13a3af5e603070d47ca7cc4976e6a8c247594e2b3dd0"},
+    {file = "dearpygui-2.3.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:cd7d63969fb174388bc8c99357fc71c796a8b799d53c03009c0d107fdbccdcad"},
+    {file = "dearpygui-2.3.1-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:10e6de05dd1441ad8200ff686ad204700dfb931f4fa00e6b58b49641f0d69a26"},
+    {file = "dearpygui-2.3.1-cp38-cp38-win_amd64.whl", hash = "sha256:26c50477813b90cc654d6320a1e8b8205dd6478e6c9c2ffcbb5664ce331ff885"},
+    {file = "dearpygui-2.3.1-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:fc965058229e5c5fd448bce1e3f749174fc7c68c0616bef5d06f5d30a7689ec6"},
+    {file = "dearpygui-2.3.1-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:21bbdde9c77ee4472e47aea351e649b724bac599eb041515f10c8cd583dbc4ab"},
+    {file = "dearpygui-2.3.1-cp39-cp39-win_amd64.whl", hash = "sha256:71be98a4403ebb5732fb99d13c4621bd3857a50c9390f247f33c6df336abaa10"},
+]
+
+[[package]]
 name = "defusedxml"
 version = "0.7.1"
 description = "XML bomb protection for Python stdlib modules"
@@ -557,18 +593,6 @@ symfont = ["sympy"]
 type1 = ["xattr ; sys_platform == \"darwin\""]
 unicode = ["unicodedata2 (>=15.1.0) ; python_version <= \"3.12\""]
 woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "brotlicffi (>=0.8.0) ; platform_python_implementation != \"CPython\"", "zopfli (>=0.1.4)"]
-
-[[package]]
-name = "freesimplegui"
-version = "5.2.0.post1"
-description = "The free-forever Python GUI framework."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "freesimplegui-5.2.0.post1-py3-none-any.whl", hash = "sha256:3d61eb519324503232f86b2f1bd7f5c6813ce225f6e189d0fd737ddb036af4d5"},
-    {file = "freesimplegui-5.2.0.post1.tar.gz", hash = "sha256:e58a0e6758e9a9e87152256911f94fcc3998356d1309973a9f4d9df2dc55f98a"},
-]
 
 [[package]]
 name = "imageio"
@@ -1683,4 +1707,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "1b0a46c48d64f71ba20c8ec6178af1cc2acd0a3c1d4bcdfcf123e7490e350e93"
+content-hash = "e232e2806d701d4f955973d08df69876eb1cf9c26a3e4f8cd4bea67387b007d2"

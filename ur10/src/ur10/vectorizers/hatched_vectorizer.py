@@ -1,4 +1,3 @@
-import FreeSimpleGUI as sg
 import vpype
 import hatched
 import numpy as np
@@ -6,7 +5,7 @@ import time
 import traceback
 import threading
 
-def run_hatched_thread(window: sg.Window, params: dict, stop_event: "threading.Event"):
+def run_hatched_thread(window, params: dict, stop_event: "threading.Event"):
     """
     Runs the 'hatch' function in a separate thread and sends the
     resulting document back to the main GUI loop.

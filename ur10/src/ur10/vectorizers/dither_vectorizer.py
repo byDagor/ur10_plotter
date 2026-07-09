@@ -1,4 +1,3 @@
-import FreeSimpleGUI as sg
 import vpype as vp
 from vpype_cli import execute
 import numpy as np
@@ -259,7 +258,7 @@ def _dither_task(params: dict, result_queue: multiprocessing.Queue):
         traceback.print_exc()
         result_queue.put((False, str(e), False))
 
-def run_dither_thread(window: sg.Window, params: dict, stop_event: "threading.Event"):
+def run_dither_thread(window, params: dict, stop_event: "threading.Event"):
     """
     This function runs in a thread and manages a separate process for the
     actual dithering work. This allows the work to be terminated and avoids GIL issues.

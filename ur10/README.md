@@ -20,15 +20,17 @@ The workflow is:
 poetry install
 ```
 
-Key dependencies (see `pyproject.toml` for the full list): `freesimplegui`, `vpype`, `vpype-flow-imager`, `cairosvg`, `reportlab`, `matplotlib`, `numpy`, `ur-rtde`, `svg.path`.
+Key dependencies (see `pyproject.toml` for the full list): `dearpygui`, `vpype`, `vpype-flow-imager`, `cairosvg`, `reportlab`, `matplotlib`, `numpy`, `ur-rtde`, `svg.path`.
 
 ## Running
 
 Run from the **project root** (the directory containing `home_config.json`):
 
 ```bash
-python src/ur10/ur10_plotter_gui.py
+python src/ur10/plottur10.py
 ```
+
+The interface is built with **Dear PyGui** — a canvas-first layout with native vector previews and a resizable drawing area. Image-processing and robot logic live in framework-agnostic modules under `src/ur10/`, driven by the `app/` view package.
 
 > The working directory matters: internal imports resolve against `src/ur10/`, and `home_config.json` is read/written with a relative path, so it is only found when the current directory is the project root.
 
@@ -45,7 +47,7 @@ Each vectorizer produces an SVG that the robot can plot. Long-running vectorizat
 - **Dither** — Converts an image into a field of dots using Floyd-Steinberg, ordered (halftone), or stochastic dithering. Supports optional CMYK separation for multi-pen plotting.
 - **Text** — Lays out plotter-friendly single-stroke (Hershey) text as an SVG.
 
-Each vectorizer tab also offers **Optimize** (vpype `linemerge` / `linesimplify` / `linesort`) and **Save SVG**. See the **Instructions** tab in the app for a description of every parameter.
+Flow and Hatched offer **Optimize** (vpype `linemerge` / `linesimplify` / `linesort`); Dither offers **Reorder for Shortest Travel** (`linesort` — the only operation that helps point dots). All offer **Save SVG**. See the **Instructions** tab in the app for a description of every parameter.
 
 ### UR10 Control tab
 
@@ -53,8 +55,7 @@ Loads an SVG and drives the robot. Controls:
 
 - **Robot IP** — The IP address of the UR10 robot.
 - **Connect to UR10** — Connects to the robot at the specified IP address.
-- **SVG File** — The SVG file to be plotted.
-- **Render SVG as dots** — Interpret the SVG as dots (use this for dithered files).
+- **SVG File** — The SVG to plot (Browse opens a native file dialog). Dithered files are auto-detected and rendered as dots.
 - **Set Home to Current Position** — Move the robot so the pen is touching the canvas corner, then set this as the "drawing Z-height". Travel moves happen 10mm above this point.
 - **Canvas Corner** — The corner of the canvas to use as the origin.
 - **Global Rotation** — Rotates the drawing about the home point before plotting.
@@ -78,9 +79,13 @@ The **Real-time Drawing** preview shows the plot as the robot draws it.
 
 ```
 src/ur10/
-  ur10_plotter_gui.py     # Entry point + central event loop
-  gui_layout.py           # Window and all widget definitions
-  gui_preview.py          # Matplotlib-based previews
+  plottur10.py            # Entry point (Dear PyGui)
+  app/                    # DPG view layer
+    main.py               # Shell: mode tab bar + render loop
+    bridge.py             # Worker-thread -> main-thread event bridge
+    canvas.py             # PreviewCanvas (native vector rendering)
+    tab_*.py              # One module per tab (flow/hatched/dither/text/ur10/instructions)
+    theme.py, dialogs.py, util.py, tabbase.py, vectorizer_tab.py
   hatched.py              # Bundled hatching library
   dither_converter.py     # Circle-polygon -> dot conversion
   text_object.py
@@ -90,5 +95,5 @@ src/ur10/
     ur10_controller.py    # ur_rtde motion control
 ```
 
-`other/` contains the original standalone v1.2 scripts that were refactored into this package, kept for reference only.
+`other/` contains the original standalone v1.2 scripts that predate this package, kept for reference only.
 </content>

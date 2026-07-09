@@ -12,21 +12,23 @@ The full pipeline is:
 2. **Save** that as an SVG.
 3. In the **UR10 Control** tab, load the SVG, set a physical home/origin, and **stream** the drawing to the robot as real-time `moveL` motion commands.
 
-The app is a single `FreeSimpleGUI` (PySimpleGUI fork) window with tabs: Flow Imager, Hatched, Dither, Text, UR10 Control, and Instructions.
+The app is a single **Dear PyGui** window with tabs: Flow Imager, Hatched, Dither, Text, UR10 Control, and Instructions.
 
 ## Running & tooling
 
 Dependencies are managed with **Poetry** (`pyproject.toml`, `poetry.lock`); a `.venv` is present. Python 3.11–3.13.
 
-**Run the app from the project root** (`ur10/`, the directory containing `home_config.json`):
+The app is built with **Dear PyGui**. Entry point:
 
 ```bash
-python src/ur10/ur10_plotter_gui.py
+python src/ur10/plottur10.py
 ```
 
-This working directory matters for two reasons:
-- Module imports inside `src/ur10/` are **flat, not package-relative** (e.g. `from gui_layout import ...`, `from robot.ur10_controller import ...`). They resolve because running the script puts `src/ur10/` on `sys.path[0]`.
+Run from the project root (`ur10/`, the directory containing `home_config.json`). The working directory matters for two reasons:
+- Module imports inside `src/ur10/` are **flat, not package-relative** (e.g. `from robot.ur10_controller import ...`, `from app.main import main`). They resolve because `plottur10.py` puts `src/ur10/` on `sys.path[0]`.
 - `home_config.json` is read/written with a **relative path**, so it is found only when CWD is the project root.
+
+Quick build check without clicking through the UI: `DPG_SMOKE_TEST=1 python src/ur10/plottur10.py` builds every tab, renders a few frames, prints `SMOKE TEST OK`, and exits. Use it after edits to catch import/layout errors. (It still opens a viewport, so it needs a display session.)
 
 Lint with ruff (the only dev dependency):
 
@@ -40,15 +42,11 @@ There is **no test suite** — `tests/` contains only an empty `__init__.py`. Th
 
 ### Two-stage data flow
 
-The core mental model is **image → vpype Document → SVG file → robot poses → motion stream**. The vectorizer tabs only produce SVGs; the UR10 tab consumes an SVG independently. They are decoupled by the SVG file on disk.
-
-- [src/ur10/ur10_plotter_gui.py](src/ur10/ur10_plotter_gui.py) — the entry point and the single central event loop. It owns all application state (the per-tab vpype documents, `home_pose`, the `UR10Controller` instance) and dispatches every button/event. This is the file to read first.
-- [src/ur10/gui_layout.py](src/ur10/gui_layout.py) — `create_layout()` builds the entire window and defines every widget `-KEY-`. The event loop keys must stay in sync with this file.
-- [src/ur10/gui_preview.py](src/ur10/gui_preview.py) — renders vpype `Document`s to preview images using a headless Matplotlib (`Agg`) backend. CMYK layers 1–4 map to cyan/magenta/yellow/black.
+The core mental model is **image → vpype Document → SVG file → robot poses → motion stream**. The vectorizer tabs only produce SVGs; the UR10 tab consumes an SVG independently. They are decoupled by the SVG file on disk. The view layer that drives all of this is the `app/` package (**see [Dear PyGui front-end](#dear-pygui-front-end-srcur10app) below — read that first**); the image-processing and robot logic sit in the framework-agnostic modules (`vectorizers/`, `robot/`, `hatched.py`, `dither_converter.py`, `text_object.py`), which the view layer reuses unchanged.
 
 ### Vectorizers (`src/ur10/vectorizers/`)
 
-Each produces a `vpype.Document`. They share a convention: work happens off the GUI thread and results/logs come back via `window.write_event_value(...)` events (`-LOG_MESSAGE-`, `-THREAD_DONE-`), which the main loop handles.
+Each produces a `vpype.Document`. They share a convention: work happens off the UI thread and results/logs come back via `window.write_event_value(...)` events (`-LOG_MESSAGE-`, `-THREAD_DONE-`) — where `window` is an `EventBridge` (see `app/bridge.py`) that marshals those events onto the main thread.
 
 - **flow** ([flow_vectorizer.py](src/ur10/vectorizers/flow_vectorizer.py)) — shells out to vpype's `flow_img` command (from `vpype-flow-imager`). The GUI assembles the command string.
 - **hatched** ([hatched_vectorizer.py](src/ur10/vectorizers/hatched_vectorizer.py)) — uses the bundled [src/ur10/hatched.py](src/ur10/hatched.py) library (contours + diagonal/circular hatching via shapely/skimage/OpenCV).
@@ -58,18 +56,29 @@ Each produces a `vpype.Document`. They share a convention: work happens off the 
 
 ### Dither dots quirk
 
-Dithered output is stored as tiny **closed circle polygons** (so it previews as filled dots). Before saving or optimizing, [dither_converter.py](src/ur10/dither_converter.py) `_convert_dither_circles_to_points()` collapses each circle to a **zero-length line** at its centroid, so the robot receives point/dot commands rather than tracing circles. The UR10 tab's "Render SVG as dots" checkbox switches preview and drawing to this dot interpretation.
+The dither vectorizer emits tiny **closed circle polygons** as its transport format (it must — the dither subprocess returns its result via a temp SVG, and vpype's reader drops zero-length points). [dither_converter.py](src/ur10/dither_converter.py) `_convert_dither_circles_to_points()` collapses each circle to a **zero-length line** at its centroid, so the robot receives point/dot commands rather than tracing circles. In the app the Dither tab does this collapse on receipt (grayscale), so preview/save/plot are all dots; the UR10 tab auto-detects dithered SVGs (mostly zero-length geometry) and renders them as dots without any toggle.
 
 ### Robot control (`src/ur10/robot/`)
 
 - [robot/svg_parser.py](src/ur10/robot/svg_parser.py) — `parse_svg()` is the geometry brain. It reads `<path>`, `<polyline>`, `<polygon>`, `<line>`; scales the SVG (using `viewBox` or width/height, falling back to computed bounds) to fit the canvas in **mm** preserving aspect ratio; then converts to robot poses in **meters**. Key transforms, in order:
   - Corner origin logic (`Top/Bottom Left/Right`, `Center`) positions the drawing relative to `home_pose`.
   - The robot **Y-axis is inverted** relative to SVG Y.
-  - A **global rotation** is applied around the home point — note the baked-in `rotation_angle + 45` offset used consistently in `parse_svg`, `-DRAW_LINE-` un-rotation, and `Check Canvas`. The GUI default rotation is `90`.
+  - A **global rotation** is applied around the home point, computed as `rotation_angle + 45`. The **`+45°` is a physical-mount compensation, not arbitrary**: the robot is mounted **diagonally** to the table, so its base X/Y axes sit at 45° relative to the canvas edges. The `+45` rotates the drawing back into alignment with the physical canvas. The user-facing **Global Rotation** dropdown (default `90`) then orients the drawing on top of that. The same `rotation_angle + 45` expression must stay consistent across `parse_svg`, the `-DRAW_LINE-` preview un-rotation, and `Check Canvas` — changing one without the others will misalign the live preview or canvas check against what the robot actually draws.
   - Returns `(list_of_paths, scaled_width_m, scaled_height_m)`, where each path is a list of `(x, y, z, rx, ry, rz)` poses.
 - [robot/ur10_controller.py](src/ur10/robot/ur10_controller.py) — `UR10Controller` wraps `ur_rtde` (`rtde_control` / `rtde_receive`). `execute_path_realtime()` streams the paths with `moveL`, handling pen-up/pen-down, pause, and stop via `threading.Event`s, and emits `-DRAW_LINE-` events so the GUI can draw the live preview.
 
 **Z-height model:** `home_pose` (persisted in `home_config.json`) is the pose with the **pen touching the canvas** — i.e. the drawing Z. Two module-level offsets in `ur10_controller.py` define everything else: `SAFE_Z_OFFSET` (10 mm) is the pen-up / "home" travel height, and `PEN_CHANGE_Z_OFFSET` (200 mm) is the pen-swap height. A **Dry Run** just draws at the safe Z so nothing touches the surface.
+
+### Dear PyGui front-end (`src/ur10/app/`)
+
+The `app/` package is the DPG view layer behind `plottur10.py` — the entire UI. It reuses all the logic modules unchanged; only rendering and event handling live here.
+
+- [app/main.py](src/ur10/app/main.py) — shell: builds the mode tab bar (Flow / Hatched / Dither / Text / UR10 / Instructions), owns the manual render loop, and each frame calls `bridge.pump_all()` then `canvas.pump_all()` then each tab's `on_frame()`. A viewport-resize callback re-fits every canvas.
+- [app/bridge.py](src/ur10/app/bridge.py) — **the key to reuse.** `EventBridge` implements `write_event_value(key, value)` (the FreeSimpleGUI idiom) by enqueuing events; the render loop drains them on the main thread and dispatches to handlers. This is why the vectorizer modules and `UR10Controller.execute_path_realtime` are reused **as-is** — they're handed a bridge where they expect a `window`. Worker threads never touch DPG directly.
+- [app/canvas.py](src/ur10/app/canvas.py) — `PreviewCanvas`: a resizable drawlist that caches geometry in *data space* and re-fits on resize; supports incremental `append_item` for animated drawing (demo + live plot). `document_to_items` / `svg_to_items` convert vpype Documents / SVG files to draw items, and `detect_dots` auto-identifies dithered files (>85% zero-length geometry).
+- [app/tabbase.py](src/ur10/app/tabbase.py) + [app/vectorizer_tab.py](src/ur10/app/vectorizer_tab.py) — `BaseTab` (uniform sidebar+preview relayout, per-tab log) and `VectorizerTab` (shared vectorize/stop/optimize/save + per-tab `EventBridge`). Each tab is one module (`tab_flow.py`, etc.); the Dither tab collapses the transport circles to center-point dots on receipt (grayscale) via `_transform_document`, exposes a "Reorder for Shortest Travel" button (`linesort` only — merge/simplify are inert on point dots, and raster order wastes ~60% travel), and overrides save for CMYK multi-file export. (The dither subprocess must emit circles, not bare dots, because it returns its result through a temp SVG and vpype's reader drops zero-length points — verified.)
+
+Rendering conventions carried over from the prototype: SVG-space previews use `flip_y=False` (SVG is already Y-down); the UR10 live/demo canvas uses `flip_y=True` (robot Y is inverted). The demo passes `rotation_angle=-45` to `parse_svg` to cancel the diagonal-mount `+45°` and preview upright; the real plot uses the Rotation dropdown so the live canvas mirrors the robot.
 
 ### Persisted config
 
@@ -77,8 +86,9 @@ Dithered output is stored as tiny **closed circle polygons** (so it previews as 
 
 ## Legacy / non-package code (do not treat as current)
 
-- `other/*_v1.2.py` — the original standalone scripts (`vpype_gui_v1.2.py`, `dither_v1.2.py`, etc.) that were refactored into the `src/ur10/` package. Kept for reference only.
+- `other/*_v1.2.py` — the original standalone scripts (`vpype_gui_v1.2.py`, `dither_v1.2.py`, etc.) that predate the `src/ur10/` package. Kept for reference only.
 - [src/ur10/robot_control/ur10_svg_interpreter.py](src/ur10/robot_control/ur10_svg_interpreter.py) — an old experimental standalone script (also targets an FR5 robot via `frrpc`, which is **not** a project dependency). Not part of the GUI app.
-- `README.md` is **out of date**: it references entry points (`ur10_plotter_gui_v1.0.0.py`, `vpype_gui_v1.2.py`) that no longer exist as described. Prefer this file for how to run.
+
+(The former FreeSimpleGUI front-end — `ur10_plotter_gui.py`, `gui_layout.py`, `gui_preview.py` — was removed once the Dear PyGui app reached parity.)
 </content>
 </invoke>
