@@ -24,13 +24,14 @@ from pathlib import Path
 from shapely.geometry import LineString
 
 from . import geometry
-from .models import ExtractedRoad, LatLon, PlotConfig, RoadMetadata, RoadRun
+from .models import ExtractedRoad, LabelConfig, LatLon, PlotConfig, RoadMetadata, RoadRun
 
 DEFAULT_ROADS_DIR = Path("roads")
 
 _CENTERLINE = "centerline.geojson"
 _META = "meta.json"
 _PLOT = "plot.json"
+_LABEL = "label.json"
 
 
 def road_dir(slug: str, base_dir: Path = DEFAULT_ROADS_DIR) -> Path:
@@ -95,6 +96,8 @@ def save_road(run: RoadRun, base_dir: Path = DEFAULT_ROADS_DIR) -> Path:
     (folder / _META).write_text(json.dumps(_metadata_to_dict(run.metadata), indent=2))
     if run.plot_config is not None:
         (folder / _PLOT).write_text(json.dumps(asdict(run.plot_config), indent=2))
+    if run.label_config is not None:
+        (folder / _LABEL).write_text(json.dumps(asdict(run.label_config), indent=2))
 
     return folder
 
@@ -128,7 +131,18 @@ def load_road(slug: str, base_dir: Path = DEFAULT_ROADS_DIR) -> RoadRun:
     if plot_path.exists():
         plot_config = PlotConfig(**json.loads(plot_path.read_text()))
 
-    return RoadRun(slug=slug, road=road, metadata=metadata, plot_config=plot_config)
+    label_config = None
+    label_path = folder / _LABEL
+    if label_path.exists():
+        label_config = LabelConfig(**json.loads(label_path.read_text()))
+
+    return RoadRun(
+        slug=slug,
+        road=road,
+        metadata=metadata,
+        plot_config=plot_config,
+        label_config=label_config,
+    )
 
 
 def list_roads(base_dir: Path = DEFAULT_ROADS_DIR) -> list[str]:

@@ -86,6 +86,32 @@ class PlotConfig:
 
 
 @dataclass
+class LabelConfig:
+    """Styling for an optional text label drawn on the plotted road.
+
+    The label composes stored metadata (real name, nickname, date, coordinates)
+    plus a distance readout into single-stroke Hershey text (same fonts as the
+    Text tab). It is rendered in the same paper-millimeter space as the road and
+    written into the same SVG, so the robot draws it in the one pass. ``position``
+    is an anchor preset (see ``label.POSITIONS``); ``offset_x_mm`` / ``offset_y_mm``
+    nudge from that anchor (+x right, +y up), matching the plot nudge convention.
+    """
+
+    enabled: bool = False
+    show_name: bool = True
+    show_nickname: bool = False
+    show_date: bool = True
+    show_coords: bool = False
+    show_distance: bool = False
+    font: str = "futural"
+    size_mm: float = 6.0
+    line_spacing: float = 1.4
+    position: str = "Bottom Left"
+    offset_x_mm: float = 0.0
+    offset_y_mm: float = 0.0
+
+
+@dataclass
 class RoadMetadata:
     """User-supplied facts about a run. All optional; dates are ISO strings.
 
@@ -109,3 +135,4 @@ class RoadRun:
     road: ExtractedRoad
     metadata: RoadMetadata
     plot_config: PlotConfig | None = None
+    label_config: LabelConfig | None = None

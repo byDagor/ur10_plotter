@@ -19,13 +19,15 @@ from pathlib import Path
 
 import dearpygui.dearpygui as dpg
 
-from road_outline_extracter import layout, storage, svg
-from road_outline_extracter.models import LatLon, PlotConfig, RoadMetadata, RoadRun
+from road_outline_extracter import label, layout, storage, svg
+from road_outline_extracter.models import (LabelConfig, LatLon, PlotConfig,
+                                           RoadMetadata, RoadRun)
 
 from .tabbase import BaseTab
 from .bridge import EventBridge
 from .canvas import PreviewCanvas
 from .dialogs import save_file
+from .tab_text import FONTS
 from .util import project_root
 from .theme import (section, make_button_theme, SIDEBAR_W, INK, PAPER_EDGE,
                     TEXT_DIM, C_START, C_CONNECT)
@@ -47,6 +49,12 @@ class RoadsTab(BaseTab):
         self.saved_svg_path = None
         self._start = None                  # parsed LatLon endpoints (for saving)
         self._finish = None
+
+        # Label glyph cache: re-render the (expensive) vpype text only when the
+        # text/font/size/spacing change; repositioning on nudge/rotate is cheap.
+        self._label_glyphs = None
+        self._label_glyph_key = None
+        self._label_error = None
 
         # Preview matches the produced SVG exactly: strokes are flipped to y-down
         # in _plot_items, so the canvas uses flip_y=False like the UR10 SVG preview.
@@ -93,9 +101,13 @@ class RoadsTab(BaseTab):
             dpg.add_combo(self._list_slugs(), tag="roads_saved", width=-72)
             dpg.add_button(label="Load", width=64, callback=self.load_run)
         dpg.add_button(label="Refresh List", width=-1, callback=self.refresh_runs)
-        with dpg.group(horizontal=True):
-            dpg.add_input_text(tag="roads_nick", width=-92, hint="nickname")
-            dpg.add_button(label="Save Run", width=84, callback=self.save_run)
+        dpg.add_input_text(label="Real name", tag="roads_realname", width=-90,
+                           hint="Mount Hamilton Rd", on_enter=True, callback=self.replot)
+        dpg.add_input_text(label="Nickname", tag="roads_nick", width=-90,
+                           hint="nickname", on_enter=True, callback=self.replot)
+        dpg.add_input_text(label="Date skated", tag="roads_date", width=-90,
+                           hint="YYYY-MM-DD", on_enter=True, callback=self.replot)
+        dpg.add_button(label="Save Run", width=-1, callback=self.save_run)
 
         section("Plot")
         dpg.add_input_float(label="Canvas W (mm)", tag="roads_cw", default_value=297.0,
@@ -118,6 +130,35 @@ class RoadsTab(BaseTab):
         dpg.add_input_float(label="Nudge Y (mm)", tag="roads_ny", default_value=0.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
         dpg.add_text("", tag="roads_plot_info", color=TEXT_DIM, wrap=SIDEBAR_W - 40)
+
+        section("Label")
+        dpg.add_checkbox(label="Draw label on canvas", tag="roads_lbl_on",
+                         default_value=False, callback=self.replot)
+        dpg.add_text("Include", color=TEXT_DIM)
+        with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="Name", tag="roads_lbl_name", default_value=True,
+                             callback=self.replot)
+            dpg.add_checkbox(label="Nickname", tag="roads_lbl_nick", default_value=False,
+                             callback=self.replot)
+        with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="Date", tag="roads_lbl_date", default_value=True,
+                             callback=self.replot)
+            dpg.add_checkbox(label="Coords", tag="roads_lbl_coords", default_value=False,
+                             callback=self.replot)
+        dpg.add_checkbox(label="Distance", tag="roads_lbl_dist", default_value=False,
+                         callback=self.replot)
+        dpg.add_combo(FONTS, label="Font", default_value="futural", tag="roads_lbl_font",
+                      width=150, callback=self.replot)
+        dpg.add_input_float(label="Text size (mm)", tag="roads_lbl_size", default_value=6.0,
+                            width=110, step=0, format="%.1f", on_enter=True, callback=self.replot)
+        dpg.add_input_float(label="Line spacing", tag="roads_lbl_spacing", default_value=1.4,
+                            width=110, step=0, format="%.2f", on_enter=True, callback=self.replot)
+        dpg.add_combo(label.POSITIONS, label="Position", default_value="Bottom Left",
+                      tag="roads_lbl_pos", width=150, callback=self.replot)
+        dpg.add_input_float(label="Offset X (mm)", tag="roads_lbl_ox", default_value=0.0,
+                            width=110, step=0, on_enter=True, callback=self.replot)
+        dpg.add_input_float(label="Offset Y (mm)", tag="roads_lbl_oy", default_value=0.0,
+                            width=110, step=0, on_enter=True, callback=self.replot)
 
         section("Export")
         dpg.add_button(label="Save SVG...", tag="roads_btn_save", width=-1,
@@ -225,9 +266,13 @@ class RoadsTab(BaseTab):
             dpg.set_value("roads_start", f"{run.metadata.start.lat}, {run.metadata.start.lon}")
         if run.metadata.finish:
             dpg.set_value("roads_finish", f"{run.metadata.finish.lat}, {run.metadata.finish.lon}")
-        dpg.set_value("roads_nick", run.metadata.nickname or slug)
+        dpg.set_value("roads_nick", run.metadata.nickname or "")
+        dpg.set_value("roads_realname", run.metadata.real_name or "")
+        dpg.set_value("roads_date", run.metadata.date_first_skated or "")
         if run.plot_config:
             self._apply_config(run.plot_config)
+        if run.label_config:
+            self._apply_label_config(run.label_config)
         self._set_extract_info(run.road)
         self.replot()
         self.log(f"Loaded run '{slug}'.")
@@ -236,13 +281,13 @@ class RoadsTab(BaseTab):
         if not self.road:
             self.log("Extract or load a road first.")
             return
-        nick = dpg.get_value("roads_nick").strip()
-        meta = RoadMetadata(nickname=nick or None, start=self._start, finish=self._finish)
+        meta = self._read_metadata()
         slug = storage.slug_for(meta)
         try:
             folder = storage.save_road(
                 RoadRun(slug=slug, road=self.road, metadata=meta,
-                        plot_config=self._read_config()),
+                        plot_config=self._read_config(),
+                        label_config=self._read_label_config()),
                 base_dir=self.roads_dir,
             )
         except Exception as exc:
@@ -279,6 +324,75 @@ class RoadsTab(BaseTab):
         dpg.set_value("roads_nx", cfg.pos_x_mm)
         dpg.set_value("roads_ny", cfg.pos_y_mm)
 
+    def _read_metadata(self):
+        """Build RoadMetadata from the current UI fields (used for label + save)."""
+        def clean(tag):
+            return (dpg.get_value(tag) or "").strip() or None
+
+        return RoadMetadata(
+            nickname=clean("roads_nick"),
+            real_name=clean("roads_realname"),
+            date_first_skated=clean("roads_date"),
+            start=self._start,
+            finish=self._finish,
+        )
+
+    def _read_label_config(self):
+        return LabelConfig(
+            enabled=dpg.get_value("roads_lbl_on"),
+            show_name=dpg.get_value("roads_lbl_name"),
+            show_nickname=dpg.get_value("roads_lbl_nick"),
+            show_date=dpg.get_value("roads_lbl_date"),
+            show_coords=dpg.get_value("roads_lbl_coords"),
+            show_distance=dpg.get_value("roads_lbl_dist"),
+            font=dpg.get_value("roads_lbl_font"),
+            size_mm=float(dpg.get_value("roads_lbl_size")),
+            line_spacing=float(dpg.get_value("roads_lbl_spacing")),
+            position=dpg.get_value("roads_lbl_pos"),
+            offset_x_mm=float(dpg.get_value("roads_lbl_ox")),
+            offset_y_mm=float(dpg.get_value("roads_lbl_oy")),
+        )
+
+    def _apply_label_config(self, cfg):
+        dpg.set_value("roads_lbl_on", cfg.enabled)
+        dpg.set_value("roads_lbl_name", cfg.show_name)
+        dpg.set_value("roads_lbl_nick", cfg.show_nickname)
+        dpg.set_value("roads_lbl_date", cfg.show_date)
+        dpg.set_value("roads_lbl_coords", cfg.show_coords)
+        dpg.set_value("roads_lbl_dist", cfg.show_distance)
+        dpg.set_value("roads_lbl_font", cfg.font)
+        dpg.set_value("roads_lbl_size", cfg.size_mm)
+        dpg.set_value("roads_lbl_spacing", cfg.line_spacing)
+        dpg.set_value("roads_lbl_pos", cfg.position)
+        dpg.set_value("roads_lbl_ox", cfg.offset_x_mm)
+        dpg.set_value("roads_lbl_oy", cfg.offset_y_mm)
+        self._label_glyph_key = None        # force glyph re-render for the new run
+
+    def _label_strokes(self, config, label_cfg):
+        """Label LineStrings in y-up mm, or [] if the label is off/empty.
+
+        The glyph geometry is cached by (rows, font); only placement re-runs when
+        the user drags position/nudge/spacing (which don't change glyph shape).
+        """
+        if not label_cfg.enabled:
+            return []
+        try:
+            rows = label.build_rows(self._read_metadata(), self.road, label_cfg)
+            key = (tuple((r.text, round(r.size_mm, 3), r.align, r.is_title)
+                         for r in rows), label_cfg.font)
+            if key != self._label_glyph_key:
+                self._label_glyphs = label.render_rows(rows, label_cfg.font)
+                self._label_glyph_key = key
+            self._label_error = None
+            return label.place_rows(self._label_glyphs, label_cfg,
+                                    config.canvas_w_mm, config.canvas_h_mm,
+                                    config.margin_mm)
+        except Exception as exc:            # never let a label glitch kill the preview
+            if self._label_error != str(exc):
+                self.log(f"Label render error: {exc}")
+                self._label_error = str(exc)
+            return []
+
     def _plot_items(self, result, config):
         """Preview items in the SAME y-down mm space the SVG is authored in, plus
         a canvas-border rectangle so placement/margin/nudge are visible."""
@@ -302,19 +416,33 @@ class RoadsTab(BaseTab):
             # typing). Keep the last good preview rather than clearing/logging.
             return
         self.result = result
+        n_road_strokes = len(result.strokes)
+
+        # Compose the optional metadata label into the same stroke list, so the
+        # preview, the saved SVG, and the robot all get it identically.
+        label_cfg = self._read_label_config()
+        label_strokes = self._label_strokes(config, label_cfg)
+        if label_strokes:
+            result.strokes = list(result.strokes) + label_strokes
+
         items, bounds = self._plot_items(result, config)
         self.canvas.set_items(items, bounds)
-        dpg.set_value(
-            "roads_plot_info",
+        info = (
             f"scale {result.scale_mm_per_m * 1000:.0f} mm/km - "
             f"drawn {result.draw_w_mm:.0f} x {result.draw_h_mm:.0f} mm - "
-            f"{len(result.strokes)} stroke(s)",
+            f"{n_road_strokes} stroke(s)"
         )
+        if label_strokes:
+            info += " + label"
+        elif label_cfg.enabled:
+            info += " - label on, but no fields have text (press Enter after typing)"
+        dpg.set_value("roads_plot_info", info)
 
     # ------------------------------------------------------------------ #
     # Export
     # ------------------------------------------------------------------ #
     def save_svg(self):
+        self.replot()   # fold in any label field edits not yet committed with Enter
         if not self.result:
             self.log("Nothing to export - extract/plot a road first.")
             return
@@ -331,6 +459,7 @@ class RoadsTab(BaseTab):
         self.log(f"Saved SVG to {path}.")
 
     def send_to_ur10(self):
+        self.replot()   # fold in any label field edits not yet committed with Enter
         if not self.result:
             self.log("Nothing to send - extract/plot a road first.")
             return

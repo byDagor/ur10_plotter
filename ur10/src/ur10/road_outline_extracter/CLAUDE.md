@@ -28,11 +28,20 @@ free user parameter, never hardcoded.
 
 ### Modules
 - `models.py` — `LatLon` (`.parse()` for "lat, lon" text), `ExtractedRoad`,
-  `PlotConfig`, `RoadMetadata`, `RoadRun`.
+  `PlotConfig`, `LabelConfig`, `RoadMetadata`, `RoadRun`.
 - `osm.py` — OpenStreetMap graph download + routing + centerline stitching.
 - `geometry.py` — projection (WGS84 ↔ UTM), trim-to-endpoints, simplify.
 - `pipeline.py` — thin orchestration over osm + geometry.
 - `layout.py` — plotting-stage transforms, all in **paper millimeters, y-up**.
+- `label.py` — optional metadata label. The **nickname** is a title pinned to
+  the **canvas top-center** (+2 mm); the rest form an anchored, nudgeable block:
+  **real name** / **road length** / **start + finish coords on one row** /
+  **date**. Any field toggles off. Emits
+  single-stroke Hershey text (via vpype) as `LineString`s in the **same y-up mm
+  space** as the road, so it merges straight into the stroke list. Three steps:
+  `build_rows` (per-line text/size/align spec) -> `render_rows` (per-row vpype
+  geometry; expensive, cached by the tab on rows+font) -> `place_rows` (stack +
+  anchor + flip; cheap, re-run on every position/nudge/spacing edit).
 - `svg.py` — millimeter SVG emission (flips y-up → SVG y-down).
 - `storage.py` — `roads/<slug>/` load/save, `slugify`, `road_dir`, `list_roads`.
 
@@ -52,7 +61,10 @@ Paste button.
 - **Sizing**: **fit-to-canvas**, rotation-aware; canvas W/H is a user input.
 - **Boldening**: `stroke_count` parallel passes spaced `stroke_offset_mm`
   (default 0.65, just under the 0.7 mm pen so passes overlap into a solid line).
-- **Metadata** (nickname, real name, date, coords) is **stored, not plotted**.
+- **Metadata** (real name, nickname, date, coords) is stored and can be
+  **optionally plotted** as a single-stroke Hershey label (`label.py` +
+  `LabelConfig`): pick which fields to show, font, size, line spacing, a corner
+  anchor, and an x/y nudge. Off by default; distance is a derived extra line.
 - **Capture**: two points (start + finish); in PLOTTUR10 entered as `lat, lon`
   (with a Paste button), replacing the original click-on-map.
 
@@ -95,12 +107,13 @@ re-plot offline.
 
 ## Possible future work (none committed)
 
-- Plotting the metadata as text (single-line/Hershey font).
 - A poster/gallery composing multiple runs with labels.
 - GPX import + map-matching.
+- (Explicitly **not** wanted: multi-waypoint routes — start+finish only.)
 
 ## Dependencies
 
-Runtime: `osmnx`, `geopandas`, `pyproj`, `shapely`, `numpy` (<2). Shared with the
-parent app; no separate install. Python ≥ 3.11, managed by Poetry at the ur10
-project level.
+Runtime: `osmnx`, `geopandas`, `pyproj`, `shapely`, `numpy` (<2), plus `vpype`
+(only `label.py`, for Hershey text — the same dependency the vectorizer/Text tabs
+already use; imported lazily). Shared with the parent app; no separate install.
+Python ≥ 3.11, managed by Poetry at the ur10 project level.
