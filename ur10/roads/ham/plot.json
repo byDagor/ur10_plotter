@@ -1,0 +1,12 @@
+{
+  "canvas_w_mm": 594.0,
+  "canvas_h_mm": 841.0,
+  "margin_mm": 10.0,
+  "pen_width_mm": 0.7,
+  "stroke_count": 3,
+  "stroke_offset_mm": 0.65,
+  "rotation_deg": 62,
+  "pos_x_mm": 0.0,
+  "pos_y_mm": 0.0,
+  "simplify_tolerance_mm": 0.0
+}

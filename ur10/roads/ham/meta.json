@@ -1,0 +1,14 @@
+{
+  "nickname": "Ham",
+  "real_name": "Mount Hmilton Road",
+  "date_first_skated": "2026-06-02",
+  "start": {
+    "lat": 37.33725032714077,
+    "lon": -121.6441333293915
+  },
+  "finish": {
+    "lat": 37.352300490648375,
+    "lon": -121.61386728286745
+  },
+  "created_at": "2026-07-09T21:46:45"
+}

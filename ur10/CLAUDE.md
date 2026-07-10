@@ -12,11 +12,13 @@ The full pipeline is:
 2. **Save** that as an SVG.
 3. In the **UR10 Control** tab, load the SVG, set a physical home/origin, and **stream** the drawing to the robot as real-time `moveL` motion commands.
 
-The app is a single **Dear PyGui** window with tabs: Flow Imager, Hatched, Dither, Text, UR10 Control, and Instructions.
+The app is a single **Dear PyGui** window with tabs: Flow Imager, Hatched, Dither, Text, Roads, UR10 Control, and Instructions.
+
+The **Roads** tab is a second front-end to step 1: instead of vectorizing an image, it extracts a real road's centerline from OpenStreetMap and lays it out as a millimeter SVG (see the **Roads tab** section under Architecture). Steps 2–3 are unchanged — it produces an SVG the UR10 tab consumes like any other.
 
 ## Running & tooling
 
-Dependencies are managed with **Poetry** (`pyproject.toml`, `poetry.lock`); a `.venv` is present. Python 3.11–3.13.
+Dependencies are managed with **Poetry** (`pyproject.toml`, `poetry.lock`); a `.venv` is present. Python 3.11–3.13. The Roads tab adds `osmnx` / `geopandas` / `pyproj` (resolved against the `numpy<2` pin — they slot in without disturbing it).
 
 The app is built with **Dear PyGui**. Entry point:
 
@@ -24,7 +26,7 @@ The app is built with **Dear PyGui**. Entry point:
 python src/ur10/plottur10.py
 ```
 
-Run from the project root (`ur10/`, the directory containing `home_config.json`). The working directory matters for two reasons:
+Use the project virtualenv interpreter for commands — on Windows that's `.venv/Scripts/python.exe` (e.g. `.venv/Scripts/python.exe src/ur10/plottur10.py`). Run from the project root (`ur10/`, the directory containing `home_config.json`). The working directory matters for two reasons:
 - Module imports inside `src/ur10/` are **flat, not package-relative** (e.g. `from robot.ur10_controller import ...`, `from app.main import main`). They resolve because `plottur10.py` puts `src/ur10/` on `sys.path[0]`.
 - `home_config.json` is read/written with a **relative path**, so it is found only when CWD is the project root.
 
@@ -58,6 +60,19 @@ Each produces a `vpype.Document`. They share a convention: work happens off the 
 
 The dither vectorizer emits tiny **closed circle polygons** as its transport format (it must — the dither subprocess returns its result via a temp SVG, and vpype's reader drops zero-length points). [dither_converter.py](src/ur10/dither_converter.py) `_convert_dither_circles_to_points()` collapses each circle to a **zero-length line** at its centroid, so the robot receives point/dot commands rather than tracing circles. In the app the Dither tab does this collapse on receipt (grayscale), so preview/save/plot are all dots; the UR10 tab auto-detects dithered SVGs (mostly zero-length geometry) and renders them as dots without any toggle.
 
+### Roads tab (`src/ur10/road_outline_extracter/`)
+
+A second SVG source: draw a **real-world road** extracted from OpenStreetMap (relocated + de-Streamlit'd from a standalone project; the logic modules are framework-agnostic and reused as-is, wrapped by [app/tab_roads.py](src/ur10/app/tab_roads.py) in the same DPG idioms as the vectorizer tabs). **Extract once, plot many ways** — two stages:
+
+1. **Extract** (`pipeline.extract_road`): two `lat, lon` points → `osm` downloads the local road graph and routes between them → `geometry` projects to UTM, trims to the exact endpoints, simplifies → `ExtractedRoad`. Only this stage needs the network; **osmnx is imported lazily** inside the extract worker so startup doesn't pay for it. Runs off-thread via the tab's `EventBridge` (`-ROADS_DONE-`), like a vectorizer (plain daemon thread — no process kill).
+2. **Plot** (`layout.plan`): `ExtractedRoad.line_utm` + `PlotConfig` → rotate → fit-to-canvas (rotation-aware) → center + nudge → `stroke_count` parallel passes (bolding) → `svg.render` emits a **millimeter** SVG (`<path>` M/L, `viewBox` in mm). Pure and fast, so the preview replots live on each control edit.
+
+**Handoff:** "Send to UR10" writes `road_for_ur10.svg` at the project root, sets the UR10 tab's canvas W/H to the road's true size, previews it, and switches to the UR10 tab — the SVG then flows through `parse_svg` unchanged.
+
+**Preview convention:** strokes are flipped to y-down mm exactly as `svg.render` writes them (`canvas_h - y`) and drawn with `flip_y=False`, plus a canvas-border rectangle, so the preview matches the saved SVG and the robot output.
+
+**Storage / UX:** runs persist under `roads/<slug>/` (WGS84 `centerline.geojson` + `meta.json` + `plot.json`); the tab passes an explicit `base_dir` so it doesn't depend on CWD. Three example runs are committed (canonical: Mount Hamilton). Coordinate entry uses a **Paste** button (`dpg.get_clipboard_text()`) — DPG's `input_text` doesn't reliably paste with Ctrl+V, and ImGui has no right-click menu. The module keeps its own [CLAUDE.md](src/ur10/road_outline_extracter/CLAUDE.md) for the geometry details (WGS84-canonical; metric math on the UTM line; osmnx `simplify=False` gotcha).
+
 ### Robot control (`src/ur10/robot/`)
 
 - [robot/svg_parser.py](src/ur10/robot/svg_parser.py) — `parse_svg()` is the geometry brain. It reads `<path>`, `<polyline>`, `<polygon>`, `<line>`; scales the SVG (using `viewBox` or width/height, falling back to computed bounds) to fit the canvas in **mm** preserving aspect ratio; then converts to robot poses in **meters**. Key transforms, in order:
@@ -65,6 +80,7 @@ The dither vectorizer emits tiny **closed circle polygons** as its transport for
   - The robot **Y-axis is inverted** relative to SVG Y.
   - A **global rotation** is applied around the home point, computed as `rotation_angle + 45`. The **`+45°` is a physical-mount compensation, not arbitrary**: the robot is mounted **diagonally** to the table, so its base X/Y axes sit at 45° relative to the canvas edges. The `+45` rotates the drawing back into alignment with the physical canvas. The user-facing **Global Rotation** dropdown (default `90`) then orients the drawing on top of that. The same `rotation_angle + 45` expression must stay consistent across `parse_svg`, the `-DRAW_LINE-` preview un-rotation, and `Check Canvas` — changing one without the others will misalign the live preview or canvas check against what the robot actually draws.
   - Returns `(list_of_paths, scaled_width_m, scaled_height_m)`, where each path is a list of `(x, y, z, rx, ry, rz)` poses.
+  - **`<path>` handling:** `_get_points_from_element` flattens a path `d` into continuous subpaths (split on `Move`, take `Line` endpoints, sample curves/arcs, honor `Close`). The **Roads** SVGs are the first `<path>` consumer — every vectorizer emits `<polyline>` — which is why this branch had a latent bug (it called `continuous_subpaths()`, a `svgpathtools` method absent from the `svg.path` library) that went unnoticed until roads exercised it.
 - [robot/ur10_controller.py](src/ur10/robot/ur10_controller.py) — `UR10Controller` wraps `ur_rtde` (`rtde_control` / `rtde_receive`). `execute_path_realtime()` streams the paths with `moveL`, handling pen-up/pen-down, pause, and stop via `threading.Event`s, and emits `-DRAW_LINE-` events so the GUI can draw the live preview.
 
 **Z-height model:** `home_pose` (persisted in `home_config.json`) is the pose with the **pen touching the canvas** — i.e. the drawing Z. Two module-level offsets in `ur10_controller.py` define everything else: `SAFE_Z_OFFSET` (10 mm) is the pen-up / "home" travel height, and `PEN_CHANGE_Z_OFFSET` (200 mm) is the pen-swap height. A **Dry Run** just draws at the safe Z so nothing touches the surface.

@@ -34,6 +34,7 @@ class UR10Tab(BaseTab):
 
     def __init__(self):
         super().__init__()
+        self.tab_id = None          # set in build(); lets other tabs switch here
         self.controller = None
         self.connected = False
         self.home_pose = None
@@ -59,6 +60,7 @@ class UR10Tab(BaseTab):
     # Layout
     # ------------------------------------------------------------------ #
     def build(self, parent):
+        self.tab_id = parent
         with dpg.group(horizontal=True, parent=parent):
             with dpg.child_window(tag=self.sidebar_tag, width=400):
                 section("Connection", pad_top=2)

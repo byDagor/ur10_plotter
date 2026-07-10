@@ -1,7 +1,50 @@
 import math
 from xml.dom import minidom
-from svg.path import parse_path
+from svg.path import parse_path, Move, Close, Line
 import re
+
+_CURVE_SAMPLES = 16   # points per curved segment when flattening a <path>
+
+
+def _points_from_path_d(d):
+    """Flatten an SVG path 'd' string into continuous subpaths (lists of (x, y)).
+
+    The svg.path library has no continuous_subpaths(), so we split on Move
+    commands ourselves: a Line contributes its endpoint, curves/arcs are sampled,
+    and Close appends the closing point. Segment endpoints are complex numbers
+    whose (real, imag) are (x, y).
+    """
+    subpaths = []
+    current = []
+
+    def flush():
+        if len(current) >= 2:
+            subpaths.append(list(current))
+
+    for seg in parse_path(d):
+        if isinstance(seg, Move):
+            flush()
+            current.clear()
+            current.append((seg.end.real, seg.end.imag))
+        elif isinstance(seg, Close):
+            if current:
+                current.append((seg.end.real, seg.end.imag))
+            flush()
+            current.clear()
+        elif isinstance(seg, Line):
+            if not current:
+                current.append((seg.start.real, seg.start.imag))
+            current.append((seg.end.real, seg.end.imag))
+        else:  # CubicBezier / QuadraticBezier / Arc -> sample along the curve
+            if not current:
+                current.append((seg.start.real, seg.start.imag))
+            for i in range(1, _CURVE_SAMPLES + 1):
+                p = seg.point(i / _CURVE_SAMPLES)
+                current.append((p.real, p.imag))
+
+    flush()
+    return subpaths
+
 
 def _get_points_from_element(element):
     """
@@ -10,18 +53,7 @@ def _get_points_from_element(element):
     """
     paths = []
     if element.tagName == 'path':
-        d = element.getAttribute('d')
-        path_obj = parse_path(d)
-        for subpath in path_obj.continuous_subpaths():
-            points = []
-            if not subpath:
-                continue
-            # Add the start point of the first segment
-            points.append((subpath[0].start.real, subpath[0].start.imag))
-            for segment in subpath:
-                points.append((segment.end.real, segment.end.imag))
-            if points:
-                paths.append(points)
+        paths.extend(_points_from_path_d(element.getAttribute('d')))
 
     elif element.tagName in ['polyline', 'polygon']:
         point_str = element.getAttribute('points')

@@ -35,7 +35,15 @@ def _build_tabs():
     except Exception as exc:                              # pragma: no cover
         print(f"Text tab unavailable: {exc}")
 
-    tabs.append(UR10Tab())
+    # UR10 tab is created before Roads so Roads can hand its SVGs straight to it.
+    ur10_tab = UR10Tab()
+    try:
+        from .tab_roads import RoadsTab
+        tabs.append(RoadsTab(ur10_tab))
+    except Exception as exc:                              # pragma: no cover
+        print(f"Roads tab unavailable: {exc}")
+
+    tabs.append(ur10_tab)
 
     try:
         from .tab_instructions import InstructionsTab

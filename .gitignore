@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Roads tab: scratch SVG written by "Send to UR10" (regenerated each time)
+road_for_ur10.svg
