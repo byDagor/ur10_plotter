@@ -87,14 +87,18 @@ class PlotConfig:
 
 @dataclass
 class LabelConfig:
-    """Styling for an optional text label drawn on the plotted road.
+    """Styling for the optional on-canvas annotations of a plotted road.
 
-    The label composes stored metadata (real name, nickname, date, coordinates)
-    plus a distance readout into single-stroke Hershey text (same fonts as the
-    Text tab). It is rendered in the same paper-millimeter space as the road and
-    written into the same SVG, so the robot draws it in the one pass. ``position``
-    is an anchor preset (see ``label.POSITIONS``); ``offset_x_mm`` / ``offset_y_mm``
-    nudge from that anchor (+x right, +y up), matching the plot nudge convention.
+    The text label composes stored metadata (real name, nickname, date,
+    coordinates) plus a distance readout into single-stroke Hershey text (same
+    fonts as the Text tab). It is rendered in the same paper-millimeter space as
+    the road and written into the same SVG, so the robot draws it in the one
+    pass. ``position`` is an anchor preset (see ``label.POSITIONS``);
+    ``offset_x_mm`` / ``offset_y_mm`` nudge from that anchor (+x right, +y up),
+    matching the plot nudge convention.
+
+    A separate north ``compass`` (see ``compass.py``) can be toggled on; it is
+    pinned to the bottom-right corner and its needle tracks the plot rotation.
     """
 
     enabled: bool = False
@@ -109,6 +113,8 @@ class LabelConfig:
     position: str = "Bottom Left"
     offset_x_mm: float = 0.0
     offset_y_mm: float = 0.0
+    compass_enabled: bool = False
+    compass_radius_mm: float = 9.0
 
 
 @dataclass

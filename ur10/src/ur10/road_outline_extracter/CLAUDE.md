@@ -42,6 +42,12 @@ free user parameter, never hardcoded.
   `build_rows` (per-line text/size/align spec) -> `render_rows` (per-row vpype
   geometry; expensive, cached by the tab on rows+font) -> `place_rows` (stack +
   anchor + flip; cheap, re-run on every position/nudge/spacing edit).
+- `compass.py` — optional minimal north compass (a symmetric rhombus needle + a
+  3-stroke "N", no ring) pinned to the bottom-right corner. Pure geometry, no
+  font. Its needle points to
+  `(-sin θ, cos θ)` in the y-up frame, i.e. where north lands after `layout`
+  rotates the road CCW by `rotation_deg`, so it stays truthful under any rotation.
+  Emits `LineString`s in the same y-up mm space, merged into the stroke list.
 - `svg.py` — millimeter SVG emission (flips y-up → SVG y-down).
 - `storage.py` — `roads/<slug>/` load/save, `slugify`, `road_dir`, `list_roads`.
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import dearpygui.dearpygui as dpg
 
-from road_outline_extracter import label, layout, storage, svg
+from road_outline_extracter import compass, label, layout, storage, svg
 from road_outline_extracter.models import (LabelConfig, LatLon, PlotConfig,
                                            RoadMetadata, RoadRun)
 
@@ -159,6 +159,12 @@ class RoadsTab(BaseTab):
                             width=110, step=0, on_enter=True, callback=self.replot)
         dpg.add_input_float(label="Offset Y (mm)", tag="roads_lbl_oy", default_value=0.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
+
+        section("Compass")
+        dpg.add_checkbox(label="North compass (bottom-right)", tag="roads_cmp_on",
+                         default_value=False, callback=self.replot)
+        dpg.add_input_float(label="Size (mm)", tag="roads_cmp_r", default_value=9.0,
+                            width=110, step=0, format="%.1f", on_enter=True, callback=self.replot)
 
         section("Export")
         dpg.add_button(label="Save SVG...", tag="roads_btn_save", width=-1,
@@ -351,6 +357,8 @@ class RoadsTab(BaseTab):
             position=dpg.get_value("roads_lbl_pos"),
             offset_x_mm=float(dpg.get_value("roads_lbl_ox")),
             offset_y_mm=float(dpg.get_value("roads_lbl_oy")),
+            compass_enabled=dpg.get_value("roads_cmp_on"),
+            compass_radius_mm=float(dpg.get_value("roads_cmp_r")),
         )
 
     def _apply_label_config(self, cfg):
@@ -366,6 +374,8 @@ class RoadsTab(BaseTab):
         dpg.set_value("roads_lbl_pos", cfg.position)
         dpg.set_value("roads_lbl_ox", cfg.offset_x_mm)
         dpg.set_value("roads_lbl_oy", cfg.offset_y_mm)
+        dpg.set_value("roads_cmp_on", cfg.compass_enabled)
+        dpg.set_value("roads_cmp_r", cfg.compass_radius_mm)
         self._label_glyph_key = None        # force glyph re-render for the new run
 
     def _label_strokes(self, config, label_cfg):
@@ -418,12 +428,19 @@ class RoadsTab(BaseTab):
         self.result = result
         n_road_strokes = len(result.strokes)
 
-        # Compose the optional metadata label into the same stroke list, so the
-        # preview, the saved SVG, and the robot all get it identically.
+        # Compose the optional annotations (metadata label + north compass) into
+        # the same stroke list, so the preview, the saved SVG, and the robot all
+        # get them identically.
         label_cfg = self._read_label_config()
         label_strokes = self._label_strokes(config, label_cfg)
-        if label_strokes:
-            result.strokes = list(result.strokes) + label_strokes
+        compass_strokes = (
+            compass.render(config.rotation_deg, config.canvas_w_mm, config.canvas_h_mm,
+                           config.margin_mm, label_cfg.compass_radius_mm)
+            if label_cfg.compass_enabled else []
+        )
+        extras = label_strokes + compass_strokes
+        if extras:
+            result.strokes = list(result.strokes) + extras
 
         items, bounds = self._plot_items(result, config)
         self.canvas.set_items(items, bounds)
@@ -432,8 +449,9 @@ class RoadsTab(BaseTab):
             f"drawn {result.draw_w_mm:.0f} x {result.draw_h_mm:.0f} mm - "
             f"{n_road_strokes} stroke(s)"
         )
-        if label_strokes:
-            info += " + label"
+        tags = (["label"] if label_strokes else []) + (["compass"] if compass_strokes else [])
+        if tags:
+            info += " + " + " + ".join(tags)
         elif label_cfg.enabled:
             info += " - label on, but no fields have text (press Enter after typing)"
         dpg.set_value("roads_plot_info", info)
