@@ -45,7 +45,10 @@ Paste button.
 
 ## Key decisions
 
-- **Shape**: **centerline only** (ribbon/outline is planned future work below).
+- **Shape**: **centerline only** — ribbon/outline was considered and **dropped**:
+  at real road scale the drawing is zoomed so far out that a curb-width ribbon is
+  visually indistinguishable from the centerline, so it adds complexity for no
+  visible payoff. Centerline-only is the intended final design.
 - **Sizing**: **fit-to-canvas**, rotation-aware; canvas W/H is a user input.
 - **Boldening**: `stroke_count` parallel passes spaced `stroke_offset_mm`
   (default 0.65, just under the 0.7 mm pen so passes overlap into a solid line).
@@ -92,8 +95,6 @@ re-plot offline.
 
 ## Possible future work (none committed)
 
-- Ribbon/outline mode (buffer the centerline to road width — a superset of
-  centerline; this is the "outline" the module name promises).
 - Plotting the metadata as text (single-line/Hershey font).
 - A poster/gallery composing multiple runs with labels.
 - GPX import + map-matching.
