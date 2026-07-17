@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "show_name": true,
+  "show_nickname": true,
+  "show_date": true,
+  "show_coords": false,
+  "show_distance": true,
+  "font": "futural",
+  "size_mm": 4.0,
+  "line_spacing": 1.399999976158142,
+  "position": "Bottom Left",
+  "offset_x_mm": 0.0,
+  "offset_y_mm": 0.0,
+  "clearance_mm": 5.0,
+  "compass_enabled": true,
+  "compass_radius_mm": 9.0
+}

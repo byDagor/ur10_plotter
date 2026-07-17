@@ -13,8 +13,8 @@ identically. It is pure geometry (the "N" is three strokes) — no font needed.
 
 North direction: ``layout`` rotates the road counter-clockwise by
 ``rotation_deg`` (shapely convention), so north — originally +y — rotates with
-it to ``(-sin θ, cos θ)`` in the y-up frame. The needle/arrowhead rotate with
-north; the "N" stays upright so it is always readable.
+it to ``(-sin θ, cos θ)`` in the y-up frame. The needle rotates with north; the
+"N" stays upright so it is always readable.
 """
 
 from __future__ import annotations

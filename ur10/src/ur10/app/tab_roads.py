@@ -110,9 +110,9 @@ class RoadsTab(BaseTab):
         dpg.add_button(label="Save Run", width=-1, callback=self.save_run)
 
         section("Plot")
-        dpg.add_input_float(label="Canvas W (mm)", tag="roads_cw", default_value=297.0,
+        dpg.add_input_float(label="Canvas W (mm)", tag="roads_cw", default_value=140.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
-        dpg.add_input_float(label="Canvas H (mm)", tag="roads_ch", default_value=210.0,
+        dpg.add_input_float(label="Canvas H (mm)", tag="roads_ch", default_value=216.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
         dpg.add_input_float(label="Margin (mm)", tag="roads_margin", default_value=10.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
@@ -149,7 +149,7 @@ class RoadsTab(BaseTab):
                          callback=self.replot)
         dpg.add_combo(FONTS, label="Font", default_value="futural", tag="roads_lbl_font",
                       width=150, callback=self.replot)
-        dpg.add_input_float(label="Text size (mm)", tag="roads_lbl_size", default_value=6.0,
+        dpg.add_input_float(label="Text size (mm)", tag="roads_lbl_size", default_value=4.0,
                             width=110, step=0, format="%.1f", on_enter=True, callback=self.replot)
         dpg.add_input_float(label="Line spacing", tag="roads_lbl_spacing", default_value=1.4,
                             width=110, step=0, format="%.2f", on_enter=True, callback=self.replot)
@@ -159,6 +159,8 @@ class RoadsTab(BaseTab):
                             width=110, step=0, on_enter=True, callback=self.replot)
         dpg.add_input_float(label="Offset Y (mm)", tag="roads_lbl_oy", default_value=0.0,
                             width=110, step=0, on_enter=True, callback=self.replot)
+        dpg.add_input_float(label="Road gap (mm)", tag="roads_lbl_gap", default_value=4.0,
+                            width=110, step=0, format="%.1f", on_enter=True, callback=self.replot)
 
         section("Compass")
         dpg.add_checkbox(label="North compass (bottom-right)", tag="roads_cmp_on",
@@ -357,6 +359,7 @@ class RoadsTab(BaseTab):
             position=dpg.get_value("roads_lbl_pos"),
             offset_x_mm=float(dpg.get_value("roads_lbl_ox")),
             offset_y_mm=float(dpg.get_value("roads_lbl_oy")),
+            clearance_mm=float(dpg.get_value("roads_lbl_gap")),
             compass_enabled=dpg.get_value("roads_cmp_on"),
             compass_radius_mm=float(dpg.get_value("roads_cmp_r")),
         )
@@ -374,34 +377,37 @@ class RoadsTab(BaseTab):
         dpg.set_value("roads_lbl_pos", cfg.position)
         dpg.set_value("roads_lbl_ox", cfg.offset_x_mm)
         dpg.set_value("roads_lbl_oy", cfg.offset_y_mm)
+        dpg.set_value("roads_lbl_gap", cfg.clearance_mm)
         dpg.set_value("roads_cmp_on", cfg.compass_enabled)
         dpg.set_value("roads_cmp_r", cfg.compass_radius_mm)
         self._label_glyph_key = None        # force glyph re-render for the new run
 
     def _label_strokes(self, config, label_cfg):
-        """Label LineStrings in y-up mm, or [] if the label is off/empty.
+        """Label LineStrings (y-up mm) plus the rectangles they occupy, or
+        ([], []) if the label is off/empty.
 
         The glyph geometry is cached by (rows, font); only placement re-runs when
         the user drags position/nudge/spacing (which don't change glyph shape).
+        The rectangles let ``layout`` fit the road clear of the label.
         """
         if not label_cfg.enabled:
-            return []
+            return [], []
         try:
             rows = label.build_rows(self._read_metadata(), self.road, label_cfg)
-            key = (tuple((r.text, round(r.size_mm, 3), r.align, r.is_title)
+            key = (tuple((r.text, round(r.size_mm, 3), r.is_title)
                          for r in rows), label_cfg.font)
             if key != self._label_glyph_key:
                 self._label_glyphs = label.render_rows(rows, label_cfg.font)
                 self._label_glyph_key = key
             self._label_error = None
-            return label.place_rows(self._label_glyphs, label_cfg,
-                                    config.canvas_w_mm, config.canvas_h_mm,
-                                    config.margin_mm)
+            args = (self._label_glyphs, label_cfg, config.canvas_w_mm,
+                    config.canvas_h_mm, config.margin_mm)
+            return label.place_rows(*args), label.obstacle_boxes(*args)
         except Exception as exc:            # never let a label glitch kill the preview
             if self._label_error != str(exc):
                 self.log(f"Label render error: {exc}")
                 self._label_error = str(exc)
-            return []
+            return [], []
 
     def _plot_items(self, result, config):
         """Preview items in the SAME y-down mm space the SVG is authored in, plus
@@ -418,9 +424,16 @@ class RoadsTab(BaseTab):
     def replot(self, sender=None, app_data=None, user_data=None):
         if not self.road:
             return
+        config = self._read_config()
+
+        # The label is placed independently of the road's shape, so compute it
+        # first: the road is then fit into the largest label-free rectangle.
+        label_cfg = self._read_label_config()
+        label_strokes, label_boxes = self._label_strokes(config, label_cfg)
+
         try:
-            config = self._read_config()
-            result = layout.plan(self.road.line_utm, config)
+            result = layout.plan(self.road.line_utm, config, obstacles=label_boxes,
+                                  clearance_mm=label_cfg.clearance_mm)
         except (ValueError, ZeroDivisionError):
             # Transient bad state (e.g. margin momentarily larger than canvas while
             # typing). Keep the last good preview rather than clearing/logging.
@@ -431,8 +444,6 @@ class RoadsTab(BaseTab):
         # Compose the optional annotations (metadata label + north compass) into
         # the same stroke list, so the preview, the saved SVG, and the robot all
         # get them identically.
-        label_cfg = self._read_label_config()
-        label_strokes = self._label_strokes(config, label_cfg)
         compass_strokes = (
             compass.render(config.rotation_deg, config.canvas_w_mm, config.canvas_h_mm,
                            config.margin_mm, label_cfg.compass_radius_mm)

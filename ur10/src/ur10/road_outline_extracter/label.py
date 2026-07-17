@@ -60,13 +60,13 @@ class RowSpec:
     """One line of the label before rendering: its text, size, and role.
 
     ``is_title`` rows (the nickname) are pinned to the canvas top-center; the rest
-    are body rows stacked in an anchored block. ``align`` centers a body row
-    within that block; it is ignored for title rows (always canvas-centered).
+    are body rows stacked in an anchored block and aligned within it to match the
+    block's horizontal position (left edge / center / right edge — see
+    ``place_rows``).
     """
 
     text: str
     size_mm: float
-    align: str = "left"  # "left" | "center"
     is_title: bool = False
 
 
@@ -78,7 +78,6 @@ class RenderedRow:
     size_mm: float
     width: float
     height: float
-    align: str
     is_title: bool
 
 
@@ -88,26 +87,26 @@ def build_rows(
     """Assemble the label's rows, in display order, from the selected fields.
 
     The nickname is the title (``size_mm`` + a fixed bonus), pinned to the canvas
-    top-center; everything else is body text at ``size_mm``, left-aligned.
-    Start/finish coordinates share a single row.
+    top-center; everything else is body text at ``size_mm``. Start/finish
+    coordinates share a single row.
     """
     base = config.size_mm
     rows: list[RowSpec] = []
 
     if config.show_nickname and metadata.nickname:
         rows.append(RowSpec(metadata.nickname.strip(),
-                            base + NICKNAME_SIZE_BONUS_MM, "center", is_title=True))
+                            base + NICKNAME_SIZE_BONUS_MM, is_title=True))
     if config.show_name and metadata.real_name:
-        rows.append(RowSpec(metadata.real_name.strip(), base, "left"))
+        rows.append(RowSpec(metadata.real_name.strip(), base))
     if config.show_distance and road is not None:
         km = road.length_m / 1000
-        rows.append(RowSpec(f"{km:.1f} km / {km * 0.621:.1f} mi", base, "left"))
+        rows.append(RowSpec(f"{km:.1f} km / {km * 0.621:.1f} mi", base))
     if config.show_coords and metadata.start and metadata.finish:
         s, f = metadata.start, metadata.finish
         rows.append(RowSpec(
-            f"{s.lat:.4f}, {s.lon:.4f}  ->  {f.lat:.4f}, {f.lon:.4f}", base, "left"))
+            f"{s.lat:.4f}, {s.lon:.4f}  ->  {f.lat:.4f}, {f.lon:.4f}", base))
     if config.show_date and metadata.date_first_skated:
-        rows.append(RowSpec(metadata.date_first_skated.strip(), base, "left"))
+        rows.append(RowSpec(metadata.date_first_skated.strip(), base))
 
     return [r for r in rows if r.text]
 
@@ -150,7 +149,7 @@ def render_rows(specs: list[RowSpec], font: str) -> list[RenderedRow] | None:
             continue
         polylines, width, height = result
         rendered.append(RenderedRow(polylines, spec.size_mm, width, height,
-                                    spec.align, spec.is_title))
+                                    spec.is_title))
     return rendered or None
 
 
@@ -161,6 +160,34 @@ def _emit_row(row: RenderedRow, tx: float, ty: float,
         LineString([(tx + x, canvas_h_mm - (ty + y)) for x, y in pl])
         for pl in row.polylines
     ]
+
+
+def _body_layout(
+    body: list[RenderedRow], config: LabelConfig,
+    canvas_w_mm: float, canvas_h_mm: float, inset_mm: float,
+) -> tuple[list[float], float, float, float, float, float]:
+    """Geometry of the anchored body block, in y-down mm.
+
+    Returns (row_tops, tx0, ty0, block_w, block_h, hx): the per-row top offsets
+    within the block, the block's top-left origin, its size, and the horizontal
+    anchor fraction ``hx`` (0 left / 0.5 center / 1 right). Shared by
+    ``place_rows`` (to draw the rows) and ``obstacle_boxes`` (to report the block
+    footprint) so the two never drift.
+    """
+    block_w = max(r.width for r in body)
+    tops: list[float] = []
+    y = 0.0
+    for r in body:
+        tops.append(y)
+        y += r.size_mm * config.line_spacing
+    block_h = tops[-1] + body[-1].height
+
+    hx, hy = _ANCHORS.get(config.position, (0.0, 1.0))
+    avail_w = max(canvas_w_mm - 2 * inset_mm, 0.0)
+    avail_h = max(canvas_h_mm - 2 * inset_mm, 0.0)
+    tx0 = inset_mm + hx * (avail_w - block_w) + config.offset_x_mm
+    ty0 = inset_mm + hy * (avail_h - block_h) - config.offset_y_mm
+    return tops, tx0, ty0, block_w, block_h, hx
 
 
 def place_rows(
@@ -176,7 +203,9 @@ def place_rows(
     the top edge (inset by ``inset_mm``). The body rows stack top-to-top by
     ``size_mm * line_spacing`` into a block anchored inside the canvas minus
     ``inset_mm`` at ``config.position`` and nudged by the config offsets
-    (+x right, +y up); ``align`` centers a body row within that block's width.
+    (+x right, +y up); each body row is aligned within the block to match the
+    block's horizontal position (left edge for a left anchor, centered for a
+    center anchor, right edge for a right anchor).
     """
     if not rendered:
         return []
@@ -190,25 +219,48 @@ def place_rows(
     # Body block: stacked and anchored at the chosen position.
     body = [r for r in rendered if not r.is_title]
     if body:
-        block_w = max(r.width for r in body)
-        tops: list[float] = []
-        y = 0.0
-        for r in body:
-            tops.append(y)
-            y += r.size_mm * config.line_spacing
-        block_h = tops[-1] + body[-1].height
-
-        hx, hy = _ANCHORS.get(config.position, (0.0, 1.0))
-        avail_w = max(canvas_w_mm - 2 * inset_mm, 0.0)
-        avail_h = max(canvas_h_mm - 2 * inset_mm, 0.0)
-        tx0 = inset_mm + hx * (avail_w - block_w) + config.offset_x_mm
-        ty0 = inset_mm + hy * (avail_h - block_h) - config.offset_y_mm
-
+        tops, tx0, ty0, block_w, _, hx = _body_layout(
+            body, config, canvas_w_mm, canvas_h_mm, inset_mm)
         for r, top in zip(body, tops):
-            x_off = 0.0 if r.align == "left" else (block_w - r.width) / 2
+            x_off = hx * (block_w - r.width)
             strokes += _emit_row(r, tx0 + x_off, ty0 + top, canvas_h_mm)
 
     return strokes
+
+
+def obstacle_boxes(
+    rendered: list[RenderedRow] | None,
+    config: LabelConfig,
+    canvas_w_mm: float,
+    canvas_h_mm: float,
+    inset_mm: float,
+) -> list[tuple[float, float, float, float]]:
+    """Rectangles the placed label occupies, (minx, miny, maxx, maxy) in y-up mm.
+
+    One box for the top-center title and one for the anchored body block, matching
+    exactly what ``place_rows`` draws. The Roads tab feeds these to ``layout`` so
+    the road is fit into the space the label leaves free.
+    """
+    if not rendered:
+        return []
+
+    boxes: list[tuple[float, float, float, float]] = []
+
+    # Title: centered on the canvas, at the top edge (y-down [inset, inset+h]).
+    for r in (r for r in rendered if r.is_title):
+        x0 = (canvas_w_mm - r.width) / 2
+        boxes.append((x0, canvas_h_mm - inset_mm - r.height,
+                      x0 + r.width, canvas_h_mm - inset_mm))
+
+    # Body block: the anchored, stacked rows (y-down [ty0, ty0+block_h]).
+    body = [r for r in rendered if not r.is_title]
+    if body:
+        _, tx0, ty0, block_w, block_h, _ = _body_layout(
+            body, config, canvas_w_mm, canvas_h_mm, inset_mm)
+        boxes.append((tx0, canvas_h_mm - (ty0 + block_h),
+                      tx0 + block_w, canvas_h_mm - ty0))
+
+    return boxes
 
 
 def render_label(

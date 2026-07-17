@@ -108,11 +108,12 @@ class LabelConfig:
     show_coords: bool = False
     show_distance: bool = False
     font: str = "futural"
-    size_mm: float = 6.0
+    size_mm: float = 4.0
     line_spacing: float = 1.4
     position: str = "Bottom Left"
     offset_x_mm: float = 0.0
     offset_y_mm: float = 0.0
+    clearance_mm: float = 4.0  # gap kept between the road and the label footprint
     compass_enabled: bool = False
     compass_radius_mm: float = 9.0
 

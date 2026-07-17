@@ -22,9 +22,10 @@ free user parameter, never hardcoded.
    `geometry.extract_centerline` (project to UTM, trim to the exact endpoints,
    simplify) → `ExtractedRoad`.
 2. **Plot** (`layout.plan`): `ExtractedRoad.line_utm` + `PlotConfig` → rotate →
-   fit-to-canvas (rotation-aware) → place (center + nudge) → multi-stroke
-   parallel offsets → `PlotResult.strokes` → `svg.render` (flip to SVG y-down,
-   millimeter units) → SVG string.
+   fit-to-canvas (rotation-aware, into the largest label-free rectangle when a
+   label is present) → place (center + nudge) → multi-stroke parallel offsets →
+   `PlotResult.strokes` → `svg.render` (flip to SVG y-down, millimeter units) →
+   SVG string.
 
 ### Modules
 - `models.py` — `LatLon` (`.parse()` for "lat, lon" text), `ExtractedRoad`,
@@ -33,13 +34,16 @@ free user parameter, never hardcoded.
 - `geometry.py` — projection (WGS84 ↔ UTM), trim-to-endpoints, simplify.
 - `pipeline.py` — thin orchestration over osm + geometry.
 - `layout.py` — plotting-stage transforms, all in **paper millimeters, y-up**.
+  Fits the road into the largest label-free rectangle (`_largest_free_fit`, an
+  exact maximal-empty-rectangle scan over the obstacle/canvas cut-lines) when
+  `plan`/`place_centerline` are given the label's `obstacles`.
 - `label.py` — optional metadata label. The **nickname** is a title pinned to
   the **canvas top-center** (+2 mm); the rest form an anchored, nudgeable block:
   **real name** / **road length** / **start + finish coords on one row** /
   **date**. Any field toggles off. Emits
   single-stroke Hershey text (via vpype) as `LineString`s in the **same y-up mm
   space** as the road, so it merges straight into the stroke list. Three steps:
-  `build_rows` (per-line text/size/align spec) -> `render_rows` (per-row vpype
+  `build_rows` (per-line text/size spec) -> `render_rows` (per-row vpype
   geometry; expensive, cached by the tab on rows+font) -> `place_rows` (stack +
   anchor + flip; cheap, re-run on every position/nudge/spacing edit).
 - `compass.py` — optional minimal north compass (a symmetric rhombus needle + a
@@ -69,10 +73,17 @@ Paste button.
   (default 0.65, just under the 0.7 mm pen so passes overlap into a solid line).
 - **Metadata** (real name, nickname, date, coords) is stored and can be
   **optionally plotted** as a single-stroke Hershey label (`label.py` +
-  `LabelConfig`): pick which fields to show, font, size, line spacing, a corner
-  anchor, and an x/y nudge. Off by default; distance is a derived extra line.
-- **Capture**: two points (start + finish); in PLOTTUR10 entered as `lat, lon`
-  (with a Paste button), replacing the original click-on-map.
+  `LabelConfig`): the nickname is a top-center title (+2 mm); the rest are an
+  anchored, nudgeable block (real name / road length / coords-on-one-row / date).
+  Pick which fields to show, plus font, size, line spacing, corner anchor, and
+  x/y nudge. Off by default; distance is a derived extra line.
+- **North compass** (`compass.py` + `LabelConfig.compass_*`): an optional
+  symmetric-diamond needle + "N" (no ring) in the bottom-right corner, whose
+  needle tracks `rotation_deg` so north stays truthful when the road is spun to
+  fit. Off by default.
+- **Capture**: two points (start + finish) — **not** multi-waypoint (see the
+  "not wanted" note under Future work); in PLOTTUR10 entered as `lat, lon` (with
+  a Paste button), replacing the original click-on-map.
 
 ## Coordinate-system rule (important)
 
