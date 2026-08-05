@@ -3,3 +3,9 @@ __pycache__/
 
 # Roads tab: scratch SVG written by "Send to UR10" (regenerated each time)
 road_for_ur10.svg
+
+# Roads tab: OSM / elevation network cache (regenerated on demand)
+cache/
+
+# Local test/reference images for the Trace tab (not part of the repo)
+example_images/

@@ -20,7 +20,9 @@ free user parameter, never hardcoded.
 1. **Extract** (`pipeline.extract_road`): `LatLon` points →
    `osm.download_graph` → `osm.route_nodes` → `osm.route_linestring` (WGS84) →
    `geometry.extract_centerline` (project to UTM, trim to the exact endpoints,
-   simplify) → `ExtractedRoad`.
+   simplify) → `ExtractedRoad`. The Roads tab then samples an **elevation
+   profile** (`elevation.py`) to fill `elevation_loss_m` + `max_grade_pct`,
+   best-effort (see below).
 2. **Plot** (`layout.plan`): `ExtractedRoad.line_utm` + `PlotConfig` → rotate →
    fit-to-canvas (rotation-aware, into the largest label-free rectangle when a
    label is present) → place (center + nudge) → multi-stroke parallel offsets →
@@ -33,6 +35,17 @@ free user parameter, never hardcoded.
 - `osm.py` — OpenStreetMap graph download + routing + centerline stitching.
 - `geometry.py` — projection (WGS84 ↔ UTM), trim-to-endpoints, simplify.
 - `pipeline.py` — thin orchestration over osm + geometry.
+- `elevation.py` — samples a DEM (free key-less **Open-Topo-Data** API, SRTM
+  ~30 m, over stdlib `urllib` — no extra dependency) at each vertex, then derives
+  **total descent** (`elevation_loss_m`) and **steepest grade** (`max_grade_pct`).
+  The DEM profile is metre-quantized and unevenly spaced, so a 1 m step over a 5 m
+  vertex gap reads as a 20% grade (and inflates the descent too). Both stats are
+  therefore computed on a *cleaned* profile: resampled to the DEM resolution
+  (`SAMPLE_STEP_M`), smoothed to kill the quantization (`SMOOTH_WINDOW_M`, scaled
+  down on short roads so it can't swallow their real drop), with grade measured
+  over a `GRADE_WINDOW_M` baseline — finer than that, ~30 m SRTM has no signal.
+  Best-effort: the tab catches any failure so a flaky service never blocks an
+  extraction. Stats persist in `centerline.geojson` properties (like `length_m`).
 - `layout.py` — plotting-stage transforms, all in **paper millimeters, y-up**.
   Fits the road into the largest label-free rectangle (`_largest_free_fit`, an
   exact maximal-empty-rectangle scan over the obstacle/canvas cut-lines) when
@@ -132,5 +145,6 @@ re-plot offline.
 
 Runtime: `osmnx`, `geopandas`, `pyproj`, `shapely`, `numpy` (<2), plus `vpype`
 (only `label.py`, for Hershey text — the same dependency the vectorizer/Text tabs
-already use; imported lazily). Shared with the parent app; no separate install.
+already use; imported lazily). Elevation (`elevation.py`) adds **no** dependency —
+it calls the Open-Topo-Data HTTP API over stdlib `urllib`. Shared with the parent app; no separate install.
 Python ≥ 3.11, managed by Poetry at the ur10 project level.

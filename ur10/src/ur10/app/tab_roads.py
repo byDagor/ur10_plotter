@@ -145,7 +145,12 @@ class RoadsTab(BaseTab):
                              callback=self.replot)
             dpg.add_checkbox(label="Coords", tag="roads_lbl_coords", default_value=False,
                              callback=self.replot)
-        dpg.add_checkbox(label="Distance", tag="roads_lbl_dist", default_value=False,
+        with dpg.group(horizontal=True):
+            dpg.add_checkbox(label="Distance", tag="roads_lbl_dist", default_value=False,
+                             callback=self.replot)
+            dpg.add_checkbox(label="Descent", tag="roads_lbl_descent", default_value=False,
+                             callback=self.replot)
+        dpg.add_checkbox(label="Max grade", tag="roads_lbl_grade", default_value=False,
                          callback=self.replot)
         dpg.add_combo(FONTS, label="Font", default_value="futural", tag="roads_lbl_font",
                       width=150, callback=self.replot)
@@ -224,9 +229,22 @@ class RoadsTab(BaseTab):
         try:
             from road_outline_extracter import pipeline      # lazy: pulls in osmnx
             road = pipeline.extract_road(start, finish, network_type=network)
-            self.bridge.write_event_value("-ROADS_DONE-", (road, None))
         except Exception as exc:                              # RouteNotFound / OSM / geometry
             self.bridge.write_event_value("-ROADS_DONE-", (None, str(exc)))
+            return
+        # Best-effort elevation profile: a separate free API, so never let it fail
+        # the extraction -- the road is fully usable without it.
+        try:
+            from road_outline_extracter import elevation
+            self.bridge.write_event_value(
+                "-LOG_MESSAGE-", "Fetching elevation profile...")
+            elevations = elevation.fetch_elevations(road.line_wgs84)
+            road.elevation_loss_m, road.max_grade_pct = elevation.elevation_stats(
+                road.line_utm, elevations)
+        except Exception as exc:
+            self.bridge.write_event_value(
+                "-LOG_MESSAGE-", f"Elevation unavailable ({exc}); road extracted without it.")
+        self.bridge.write_event_value("-ROADS_DONE-", (road, None))
 
     def _on_extract_done(self, value):
         road, err = value
@@ -242,8 +260,12 @@ class RoadsTab(BaseTab):
 
     def _set_extract_info(self, road):
         km = road.length_m / 1000
-        dpg.set_value("roads_extract_info",
-                      f"{km:.2f} km / {km * 0.621:.2f} mi - {road.n_points} points")
+        info = f"{km:.2f} km / {km * 0.621:.2f} mi - {road.n_points} points"
+        if road.elevation_loss_m is not None:
+            info += f" - {road.elevation_loss_m:.0f} m descent"
+        if road.max_grade_pct is not None:
+            info += f" - {road.max_grade_pct:.0f}% max grade"
+        dpg.set_value("roads_extract_info", info)
 
     # ------------------------------------------------------------------ #
     # Saved runs (roads/<slug>/)
@@ -353,6 +375,8 @@ class RoadsTab(BaseTab):
             show_date=dpg.get_value("roads_lbl_date"),
             show_coords=dpg.get_value("roads_lbl_coords"),
             show_distance=dpg.get_value("roads_lbl_dist"),
+            show_elevation_loss=dpg.get_value("roads_lbl_descent"),
+            show_max_grade=dpg.get_value("roads_lbl_grade"),
             font=dpg.get_value("roads_lbl_font"),
             size_mm=float(dpg.get_value("roads_lbl_size")),
             line_spacing=float(dpg.get_value("roads_lbl_spacing")),
@@ -371,6 +395,8 @@ class RoadsTab(BaseTab):
         dpg.set_value("roads_lbl_date", cfg.show_date)
         dpg.set_value("roads_lbl_coords", cfg.show_coords)
         dpg.set_value("roads_lbl_dist", cfg.show_distance)
+        dpg.set_value("roads_lbl_descent", cfg.show_elevation_loss)
+        dpg.set_value("roads_lbl_grade", cfg.show_max_grade)
         dpg.set_value("roads_lbl_font", cfg.font)
         dpg.set_value("roads_lbl_size", cfg.size_mm)
         dpg.set_value("roads_lbl_spacing", cfg.line_spacing)

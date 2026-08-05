@@ -48,6 +48,38 @@ SECTIONS = {
          "jump back across the page at the end of every row. This reorders them to minimize "
          "pen-up travel (typically ~60% less). Save afterward, then plot that file from the UR10 tab."),
     ],
+    "Trace": [
+        ("What it does", "Recreates a line drawing as single-stroke centerlines: every line is "
+         "redrawn as ONE pen stroke down its middle, so thickness is ignored and a thick or "
+         "double-drawn outline becomes a single line. A clean drawing (dark lines on white) "
+         "traces best; solid fills and photos scribble - use Flow/Hatched/Dither for those. "
+         "Settings only apply when you click Vectorize."),
+        ("Resolution (px)", "Working long-edge size. Set it ABOVE the source image size to "
+         "enlarge it - small or bold text needs the extra pixels to skeletonize into clean "
+         "single-line letters. Larger is slower. (Filled/bold logos still trace as single-stroke "
+         "'stick' letters, not outlined type.)"),
+        ("Smooth (px)", "Fits a smoothing spline through each traced line to remove the "
+         "pixel-staircase wobble the skeleton leaves behind. Higher = smoother, but rounds sharp "
+         "corners and pulls curves slightly loose. 0 turns it off."),
+        ("Simplify (px)", "Douglas-Peucker tolerance: drops redundant points so the SVG is "
+         "lighter. Higher = fewer points, but corners round off."),
+        ("Min stroke (px)", "Deletes any finished stroke shorter than this - clears specks and "
+         "stray marks. Too high loses small real details."),
+        ("Prune spurs (px)", "Removes little skeleton 'whiskers' - short branches that dead-end "
+         "at a junction - and rejoins the lines running through that junction. Keep it low: high "
+         "values also eat short real strokes like letter bars. (Unlike Min stroke, which only "
+         "deletes whole free-floating short marks, this shaves stubs off larger shapes.)"),
+        ("Blur", "Gaussian blur before thresholding. A little smooths jagged edges and reduces "
+         "whiskers; too much makes thin lines vanish or merge."),
+        ("Auto threshold", "Picks the black/white cutoff automatically (Otsu). Good for clean "
+         "high-contrast art. Uncheck to set Threshold by hand."),
+        ("Invert", "Trace light lines on a dark background instead of dark on light."),
+        ("Threshold", "Manual black/white cutoff (0-255) when Auto is off: pixels darker than "
+         "this are treated as ink. Raise to catch faint/pencil lines; lower to keep only the darkest."),
+        ("Optimize Drawing", "After tracing, Merge joins strokes whose ends nearly touch and the "
+         "pass reorders them for minimal pen travel. Raise Merge (mm) if lines stay fragmented, "
+         "then Save."),
+    ],
     "Text": [
         ("Content", "Text to plot; line breaks are supported."),
         ("Font", "A single-stroke (Hershey) font."),

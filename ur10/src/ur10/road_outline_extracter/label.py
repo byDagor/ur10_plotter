@@ -9,6 +9,8 @@ form a block anchored at the user's chosen position (a corner or center):
 
     <real name>
     <road length>                         <- this block is anchored + nudgeable
+    <descent m / ft>                         (optional, from the DEM profile)
+    <max grade %>                            (optional, from the DEM profile)
     <start coords>  ->  <finish coords>      (both endpoints on one row)
     <date skated>
 
@@ -101,6 +103,11 @@ def build_rows(
     if config.show_distance and road is not None:
         km = road.length_m / 1000
         rows.append(RowSpec(f"{km:.1f} km / {km * 0.621:.1f} mi", base))
+    if config.show_elevation_loss and road is not None and road.elevation_loss_m is not None:
+        m = road.elevation_loss_m
+        rows.append(RowSpec(f"{m:.0f} m / {m * 3.281:.0f} ft descent", base))
+    if config.show_max_grade and road is not None and road.max_grade_pct is not None:
+        rows.append(RowSpec(f"{road.max_grade_pct:.0f}% max grade", base))
     if config.show_coords and metadata.start and metadata.finish:
         s, f = metadata.start, metadata.finish
         rows.append(RowSpec(
@@ -119,7 +126,10 @@ def _render_line(text: str, font: str, size_mm: float):
     """
     from vpype_cli import execute  # lazy: pulls in vpype
 
-    safe = text.replace('"', "'")  # keep the double-quoted CLI arg intact
+    # vpype_cli evaluates %...% as an expression, so a literal percent (e.g. the
+    # "12% max grade" row) must be doubled; also swap inner double quotes so the
+    # double-quoted CLI arg stays intact.
+    safe = text.replace("%", "%%").replace('"', "'")
     doc = execute(f'text -f "{font}" -s {size_mm}mm -p 0mm 0mm "{safe}"')
 
     polylines: list[list[tuple[float, float]]] = []

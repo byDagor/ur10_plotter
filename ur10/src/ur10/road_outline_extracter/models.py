@@ -49,12 +49,19 @@ class ExtractedRoad:
     ``line_wgs84`` is the canonical geometry (degrees) suitable for GeoJSON and
     for redrawing on a map. ``line_utm`` is the same line projected to a local
     metric CRS (meters), which is what any distance/offset math must use.
+
+    ``elevation_loss_m`` (total descent) and ``max_grade_pct`` (steepest sustained
+    downhill) are optional, sampled from a DEM at extract time (see
+    elevation.py); they are ``None`` for roads extracted before elevation existed
+    or when the elevation service was unavailable.
     """
 
     line_wgs84: LineString
     line_utm: LineString
     utm_epsg: int
     length_m: float
+    elevation_loss_m: float | None = None
+    max_grade_pct: float | None = None
 
     @property
     def n_points(self) -> int:
@@ -107,6 +114,8 @@ class LabelConfig:
     show_date: bool = True
     show_coords: bool = False
     show_distance: bool = False
+    show_elevation_loss: bool = False
+    show_max_grade: bool = False
     font: str = "futural"
     size_mm: float = 4.0
     line_spacing: float = 1.4

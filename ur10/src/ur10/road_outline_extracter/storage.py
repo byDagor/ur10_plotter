@@ -51,14 +51,20 @@ def slug_for(metadata: RoadMetadata) -> str:
 
 
 def _geojson_feature(run: RoadRun) -> dict:
+    properties = {
+        "slug": run.slug,
+        "length_m": run.road.length_m,
+        "n_points": run.road.n_points,
+        "utm_epsg": run.road.utm_epsg,
+    }
+    # Optional elevation profile stats (absent for pre-elevation / no-DEM runs).
+    if run.road.elevation_loss_m is not None:
+        properties["elevation_loss_m"] = run.road.elevation_loss_m
+    if run.road.max_grade_pct is not None:
+        properties["max_grade_pct"] = run.road.max_grade_pct
     return {
         "type": "Feature",
-        "properties": {
-            "slug": run.slug,
-            "length_m": run.road.length_m,
-            "n_points": run.road.n_points,
-            "utm_epsg": run.road.utm_epsg,
-        },
+        "properties": properties,
         "geometry": {
             "type": "LineString",
             "coordinates": [[x, y] for x, y in run.road.line_wgs84.coords],
@@ -111,11 +117,16 @@ def load_road(slug: str, base_dir: Path = DEFAULT_ROADS_DIR) -> RoadRun:
     line_wgs84 = LineString(feature["geometry"]["coordinates"])
     utm_epsg = int(props["utm_epsg"])
     line_utm = geometry.project_line_to_epsg(line_wgs84, utm_epsg)
+    def _opt_float(value):
+        return float(value) if value is not None else None
+
     road = ExtractedRoad(
         line_wgs84=line_wgs84,
         line_utm=line_utm,
         utm_epsg=utm_epsg,
         length_m=float(props["length_m"]),
+        elevation_loss_m=_opt_float(props.get("elevation_loss_m")),
+        max_grade_pct=_opt_float(props.get("max_grade_pct")),
     )
 
     meta_path = folder / _META

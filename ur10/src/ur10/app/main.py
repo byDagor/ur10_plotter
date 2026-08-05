@@ -30,6 +30,11 @@ def _build_tabs():
     except Exception as exc:                              # pragma: no cover
         print(f"Dither tab unavailable: {exc}")
     try:
+        from .tab_trace import TraceTab
+        tabs.append(TraceTab())
+    except Exception as exc:                              # pragma: no cover
+        print(f"Trace tab unavailable: {exc}")
+    try:
         from .tab_text import TextTab
         tabs.append(TextTab())
     except Exception as exc:                              # pragma: no cover
