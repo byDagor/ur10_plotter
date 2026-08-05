@@ -9,7 +9,7 @@ import threading
 
 import dearpygui.dearpygui as dpg
 
-from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET, PEN_CHANGE_Z_OFFSET, RobotStatus
+from robot.ur10_controller import UR10Controller, SAFE_Z_OFFSET, RobotStatus
 from robot.svg_parser import parse_svg
 
 from .tabbase import BaseTab
@@ -110,11 +110,13 @@ class UR10Tab(BaseTab):
                 with dpg.group(horizontal=True):
                     dpg.add_text("Corner")
                     dpg.add_combo(("Top Left", "Top Right", "Bottom Left", "Bottom Right"),
-                                  default_value="Top Left", tag="ur10_corner", width=-1)
+                                  default_value="Top Left", tag="ur10_corner", width=-1,
+                                  callback=self._save_placement)
                 with dpg.group(horizontal=True):
                     dpg.add_text("Rotation")
                     dpg.add_combo(("0", "-90", "90", "180"), default_value="90",
-                                  tag="ur10_rotation", width=90)
+                                  tag="ur10_rotation", width=90,
+                                  callback=self._save_placement)
 
                 section("Canvas")
                 with dpg.group(horizontal=True):
@@ -208,6 +210,33 @@ class UR10Tab(BaseTab):
     # ------------------------------------------------------------------ #
     # Home / config
     # ------------------------------------------------------------------ #
+    def _config_path(self):
+        return os.path.join(_project_root(), "home_config.json")
+
+    def _save_placement(self, *args):
+        """Persist Corner + Rotation (and the current home pose) to
+        home_config.json so the placement survives a relaunch.
+
+        Fires whenever the Corner/Rotation dropdowns change and when Set Home
+        writes the pose. It read-modify-writes the existing file so the pose is
+        never dropped when only a dropdown changed.
+        """
+        cfg = {}
+        try:
+            with open(self._config_path()) as f:
+                cfg = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            cfg = {}
+        if self.home_pose:
+            cfg["pose"] = self.home_pose
+        cfg["corner"] = dpg.get_value("ur10_corner")
+        cfg["rotation"] = dpg.get_value("ur10_rotation")
+        try:
+            with open(self._config_path(), "w") as f:
+                json.dump(cfg, f)
+        except Exception as exc:
+            self.log(f"Could not save placement: {exc}")
+
     def set_home(self):
         if not (self.connected and self.controller):
             self.log("Not connected.")
@@ -217,27 +246,33 @@ class UR10Tab(BaseTab):
             self.log("Could not read current pose.")
             return
         self.home_pose = pose
-        corner = dpg.get_value("ur10_corner")
-        with open(os.path.join(_project_root(), "home_config.json"), "w") as f:
-            json.dump({"pose": pose, "corner": corner}, f)
+        self._save_placement()
         dpg.set_value("ur10_home_display", ", ".join(f"{v:.3f}" for v in pose))
         self.log("Home set and saved to home_config.json.")
 
     def load_home(self):
-        path = os.path.join(_project_root(), "home_config.json")
         try:
-            with open(path) as f:
+            with open(self._config_path()) as f:
                 cfg = json.load(f)
-            self.home_pose = cfg.get("pose")
-            corner = cfg.get("corner", "Bottom Left")
-            if self.home_pose:
-                dpg.set_value("ur10_home_display", ", ".join(f"{v:.3f}" for v in self.home_pose))
-                dpg.set_value("ur10_corner", corner)
-                self.log(f"Loaded home from home_config.json ({corner}).")
         except FileNotFoundError:
             self.log("home_config.json not found - using demo default home.")
-        except (json.JSONDecodeError, KeyError):
+            return
+        except json.JSONDecodeError:
             self.log("home_config.json unreadable.")
+            return
+        self.home_pose = cfg.get("pose")
+        corner = cfg.get("corner", "Bottom Left")
+        rotation = str(cfg.get("rotation", "90"))
+        # Restore placement independent of the pose, so Corner/Rotation persist
+        # even if Home was never set on this machine.
+        dpg.set_value("ur10_corner", corner)
+        dpg.set_value("ur10_rotation", rotation)
+        if self.home_pose:
+            dpg.set_value("ur10_home_display",
+                          ", ".join(f"{v:.3f}" for v in self.home_pose))
+            self.log(f"Loaded home from home_config.json ({corner}, rot {rotation}).")
+        else:
+            self.log(f"Loaded placement ({corner}, rot {rotation}); home pose not set.")
 
     # ------------------------------------------------------------------ #
     # File / preview / demo

@@ -94,7 +94,7 @@ A separate toggle adds a minimal **north compass** (`road_outline_extracter/comp
 
 The `app/` package is the DPG view layer behind `plottur10.py` — the entire UI. It reuses all the logic modules unchanged; only rendering and event handling live here.
 
-- [app/main.py](src/ur10/app/main.py) — shell: builds the mode tab bar (Flow / Hatched / Dither / Text / UR10 / Instructions), owns the manual render loop, and each frame calls `bridge.pump_all()` then `canvas.pump_all()` then each tab's `on_frame()`. A viewport-resize callback re-fits every canvas.
+- [app/main.py](src/ur10/app/main.py) — shell: builds the mode tab bar (Flow / Hatched / Dither / Trace / Text / Roads / UR10 / Instructions), owns the manual render loop, and each frame calls `bridge.pump_all()` then `canvas.pump_all()` then each tab's `on_frame()`. A viewport-resize callback re-fits every canvas.
 - [app/bridge.py](src/ur10/app/bridge.py) — **the key to reuse.** `EventBridge` implements `write_event_value(key, value)` (the FreeSimpleGUI idiom) by enqueuing events; the render loop drains them on the main thread and dispatches to handlers. This is why the vectorizer modules and `UR10Controller.execute_path_realtime` are reused **as-is** — they're handed a bridge where they expect a `window`. Worker threads never touch DPG directly.
 - [app/canvas.py](src/ur10/app/canvas.py) — `PreviewCanvas`: a resizable drawlist that caches geometry in *data space* and re-fits on resize; supports incremental `append_item` for animated drawing (demo + live plot). `document_to_items` / `svg_to_items` convert vpype Documents / SVG files to draw items, and `detect_dots` auto-identifies dithered files (>85% zero-length geometry).
 - [app/tabbase.py](src/ur10/app/tabbase.py) + [app/vectorizer_tab.py](src/ur10/app/vectorizer_tab.py) — `BaseTab` (uniform sidebar+preview relayout, per-tab log) and `VectorizerTab` (shared vectorize/stop/optimize/save + per-tab `EventBridge`). Each tab is one module (`tab_flow.py`, etc.); the Dither tab collapses the transport circles to center-point dots on receipt (grayscale) via `_transform_document`, exposes a "Reorder for Shortest Travel" button (`linesort` only — merge/simplify are inert on point dots, and raster order wastes ~60% travel), and overrides save for CMYK multi-file export. (The dither subprocess must emit circles, not bare dots, because it returns its result through a temp SVG and vpype's reader drops zero-length points — verified.)
@@ -103,7 +103,7 @@ Rendering conventions carried over from the prototype: SVG-space previews use `f
 
 ### Persisted config
 
-`home_config.json` stores `{"pose": [...6 values...], "corner": "..."}`. It is written by "Set Home to Current Position" and loaded at startup.
+`home_config.json` stores `{"pose": [...6 values...], "corner": "...", "rotation": "..."}`. The `pose` is written by "Set Home to Current Position"; `corner` and `rotation` are also saved immediately whenever their dropdowns change (a read-modify-write that preserves the pose), so the whole placement persists across launches. All three are loaded at startup by `load_home` — the corner/rotation are restored even if no pose was ever set.
 
 ## Legacy / non-package code (do not treat as current)
 
